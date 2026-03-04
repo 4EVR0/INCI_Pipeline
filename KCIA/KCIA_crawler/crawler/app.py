@@ -1,3 +1,4 @@
+#크롤러 실행 코드
 import logging
 
 from config import get_settings
