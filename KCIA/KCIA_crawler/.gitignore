@@ -1,0 +1,15 @@
+# python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# env
+.env
+
+# logs
+*.log
+
+# mac
+.DS_Store
+EOF
