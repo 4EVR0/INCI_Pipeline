@@ -1,10 +1,11 @@
 from typing import Any, Dict, List
 
-from src.utils import first_or_none, join_list
+from src.utils import first_or_none, join_list, normalize_item_type
 
 
 def parse_result_item(item: Dict[str, Any]) -> Dict[str, Any]:
     metadata = item.get("metadata", {}) or {}
+    item_type_raw = first_or_none(metadata.get("itemType"))
 
     row = {
         "reference_uuid": item.get("reference"),
@@ -38,7 +39,8 @@ def parse_result_item(item: Dict[str, Any]) -> Dict[str, Any]:
             metadata.get("classificationInformation")
         ),
 
-        "item_type": first_or_none(metadata.get("itemType")),
+        "item_type": item_type_raw,
+        "item_type_norm": normalize_item_type(item_type_raw),
         "status": first_or_none(metadata.get("status")),
         "official_journal_publication": first_or_none(
             metadata.get("officialJournalPublication")

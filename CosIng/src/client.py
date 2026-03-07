@@ -1,3 +1,4 @@
+import json
 import time
 from typing import Any, Dict, Optional
 
@@ -10,9 +11,11 @@ from src.utils import setup_logger
 
 
 class CosIngClient:
-    def __init__(self, log_dir):
+    def __init__(self, log_dir, item_type: str = "ingredient", search_field: str = "inciName"):
         self.logger = setup_logger(log_dir)
         self.session = self._build_session()
+        self.item_type = item_type
+        self.search_field = search_field
 
     def _build_session(self) -> requests.Session:
         session = requests.Session()
@@ -33,6 +36,37 @@ class CosIngClient:
         session.headers.update(HEADERS)
         return session
 
+    def _build_query_blob(
+        self,
+        text: str,
+        search_field: Optional[str] = None,
+        item_type: Optional[str] = None,
+        extra_must_clauses: Optional[list] = None,
+    ) -> Dict[str, Any]:
+        search_field = search_field or self.search_field
+        item_type = item_type or self.item_type
+
+        must = []
+
+        if text and text != "*":
+            must.append(
+                {
+                    "text": {
+                        "query": text,
+                        "fields": [search_field],
+                        "defaultOperator": "AND",
+                    }
+                }
+            )
+
+        if item_type:
+            must.append({"term": {"itemType": item_type}})
+
+        if extra_must_clauses:
+            must.extend(extra_must_clauses)
+
+        return {"bool": {"must": must}}
+
     def search(
         self,
         page_number: int,
@@ -47,16 +81,30 @@ class CosIngClient:
             "pageNumber": page_number,
         }
 
-        data = extra_form_fields or {}
+        query_blob = self._build_query_blob(
+            text=text,
+            search_field=(extra_form_fields or {}).get("search_field"),
+            item_type=(extra_form_fields or {}).get("item_type", self.item_type),
+            extra_must_clauses=(extra_form_fields or {}).get("extra_must_clauses"),
+        )
+
+        files = {
+            "query": (
+                "blob",
+                json.dumps(query_blob, ensure_ascii=False),
+                "application/json",
+            )
+        }
 
         self.logger.info(
-            f"Requesting page={page_number}, page_size={page_size}, text={text}"
+            f"Requesting page={page_number}, page_size={page_size}, text={text}, "
+            f"item_type={(extra_form_fields or {}).get('item_type', self.item_type)}"
         )
 
         resp = self.session.post(
             API_URL,
             params=params,
-            data=data,
+            files=files,
             timeout=TIMEOUT,
         )
 

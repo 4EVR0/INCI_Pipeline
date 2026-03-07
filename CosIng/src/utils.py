@@ -2,6 +2,7 @@ import json
 import logging
 from pathlib import Path
 from datetime import datetime
+from typing import Any, Dict, Optional
 
 
 def setup_logger(log_dir: Path) -> logging.Logger:
@@ -54,6 +55,15 @@ def load_json(path: Path, default=None):
 
 
 def normalize_name(value: str):
+    if value is None:
+        return None
+    text = str(value).strip().upper()
+    while "  " in text:
+        text = text.replace("  ", " ")
+    return text
+
+
+def normalize_item_type(value: Optional[str]) -> Optional[str]:
     if value is None:
         return None
     text = str(value).strip().upper()
