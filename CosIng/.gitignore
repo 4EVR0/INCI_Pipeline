@@ -21,12 +21,9 @@ ENV/
 !.env.example
 
 # ================================
-# Data (crawler output)
+# Data
 # ================================
 data/
-*.csv
-*.parquet
-*.json
 
 # ================================
 # Logs
@@ -58,5 +55,7 @@ Thumbs.db
 *.bak
 *.swp
 
+# local analysis scripts
+analysis/
 
 COSING_Ingredients-Fragrance.Inventory_v2.csv

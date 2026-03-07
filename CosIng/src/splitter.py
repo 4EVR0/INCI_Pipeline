@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Any
 
 from config import SAFE_LIMIT, DEFAULT_SEED_CHARS, DEFAULT_NEXT_CHARS
 from src.utils import dump_json, load_json
@@ -14,6 +14,7 @@ class CosIngQuerySplitter:
         seed_chars: Optional[List[str]] = None,
         next_chars: Optional[List[str]] = None,
         safe_limit: int = SAFE_LIMIT,
+        extra_form_fields: Optional[Dict[str, Any]] = None,
     ):
         self.client = client
         self.logger = logger
@@ -21,6 +22,7 @@ class CosIngQuerySplitter:
         self.seed_chars = seed_chars or DEFAULT_SEED_CHARS
         self.next_chars = next_chars or DEFAULT_NEXT_CHARS
         self.safe_limit = safe_limit
+        self.extra_form_fields = extra_form_fields or {}
         self.count_cache: Dict[str, int] = {}
 
         if self.cache_path and self.cache_path.exists():
@@ -36,15 +38,27 @@ class CosIngQuerySplitter:
                 f"[CACHE_SAVED] entries={len(self.count_cache)} path={self.cache_path}"
             )
 
-    def count_results(self, query: str) -> int:
-        if query in self.count_cache:
-            self.logger.info(f"[CACHE_HIT] query={query} total={self.count_cache[query]}")
-            return int(self.count_cache[query])
+    def _cache_key(self, query: str) -> str:
+        if not self.extra_form_fields:
+            return query
+        return f"{query}__FORM__{str(sorted(self.extra_form_fields.items()))}"
 
-        payload = self.client.search(page_number=1, page_size=1, text=query)
+    def count_results(self, query: str) -> int:
+        cache_key = self._cache_key(query)
+
+        if cache_key in self.count_cache:
+            self.logger.info(f"[CACHE_HIT] query={query} total={self.count_cache[cache_key]}")
+            return int(self.count_cache[cache_key])
+
+        payload = self.client.search(
+            page_number=1,
+            page_size=1,
+            text=query,
+            extra_form_fields=self.extra_form_fields,
+        )
         total = int(payload.get("totalResults", 0) or 0)
 
-        self.count_cache[query] = total
+        self.count_cache[cache_key] = total
         self.save_cache()
 
         return total
