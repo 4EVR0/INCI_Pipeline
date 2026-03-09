@@ -1,4 +1,4 @@
-# INCI Data
+# INCI_Data Pipeline
 
 화장품 성분 표준화를 위한 데이터
 KCIA 성분 사전과 CosIng 데이터베이스를 활용하여 **성분 정보 및 영문명 매핑 데이터를 구축**하는 것을 목표로 합니다.
