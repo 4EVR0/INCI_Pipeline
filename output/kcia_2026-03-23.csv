@@ -6,6 +6,11 @@ ingredient_code,std_name_ko,std_name_en,old_name_ko,old_name_en,as_of_date,sourc
 24736,아스퍼질러스/검은콩발효물,,,,,kcia,2026-03-23,kcia_2026-03-23
 24735,효모/(아스퍼질러스/검은콩발효물)/흑미발효여과물,,,,,kcia,2026-03-23,kcia_2026-03-23
 24726,알-아스퍼질러스발효여과물가루,r-Aspergillus Ferment Filtrate Powder,,,,kcia,2026-03-23,kcia_2026-03-23
+24724,밀리타리스동충하초균사체배양여과물,Cordyceps militaris Mycelium,,,,kcia,2026-03-23,kcia_2026-03-23
+24721,라벤더허브오일,Lavandula Angustifolia Herb Oil,,,,kcia,2026-03-23,kcia_2026-03-23
+24720,바질허브오일,Ocimum Basilicum Herb Oil,,,,kcia,2026-03-23,kcia_2026-03-23
+24719,테트라펩타이드-113,Tetrapeptide-113,,,,kcia,2026-03-23,kcia_2026-03-23
+24718,테트라하이드록시프로토버버린클로라이드,Tetrahydroxy Protoberberine Chloride,248262‑61‑7,,,kcia,2026-03-23,kcia_2026-03-23
 24717,테트라펩타이드-150,Tetrapeptide-150,,,,kcia,2026-03-23,kcia_2026-03-23
 24716,에이이이에이-에이이이에이,에이이이에이-에이이이에이,,,,kcia,2026-03-23,kcia_2026-03-23
 24715,펜타펩타이드-130,Pentapeptide-130,,,,kcia,2026-03-23,kcia_2026-03-23
@@ -9777,7 +9782,6 @@ ingredient_code,std_name_ko,std_name_en,old_name_ko,old_name_en,as_of_date,sourc
 12106,폴리글리세릴-5카프레이트,Polyglyceryl-5 Caprate,,,,kcia,2026-03-23,kcia_2026-03-23
 12105,폴리글리세릴-4-피이지-2코카마이드,Polyglyceryl-4-PEG-2 Cocamide,,,,kcia,2026-03-23,kcia_2026-03-23
 12104,폴리글리세릴-3스테아레이트에스이,Polyglyceryl-3 Stearate SE,,,,kcia,2026-03-23,kcia_2026-03-23
-12103,폴리글리세릴-10운데실레네이트,Polyglyceryl-10 Undecylenate,,,,kcia,2026-03-23,kcia_2026-03-23
 12102,폴리글리세릴-10트라이에루케이트,Polyglyceryl-10 Trierucate,,,,kcia,2026-03-23,kcia_2026-03-23
 12101,폴리글리세릴-10트라이데카노에이트,Polyglyceryl-10 Tridecanoate,217782-56-4,,,kcia,2026-03-23,kcia_2026-03-23
 12100,폴리글리세릴-10테트라올리에이트,Polyglyceryl-10 Tetraoleate,34424-98-1,,,kcia,2026-03-23,kcia_2026-03-23
@@ -21778,9 +21782,3 @@ ingredient_code,std_name_ko,std_name_en,old_name_ko,old_name_en,as_of_date,sourc
 9,리날룰,Linalool,78-70-6,,,kcia,2026-03-23,kcia_2026-03-23
 8,리나칸투스 콤무니스추출물,Rhinacanthus Communis Extract,,,,kcia,2026-03-23,kcia_2026-03-23
 7,백혈구추출물,Leukocyte Extract,,류코사이트추출물,,kcia,2026-03-23,kcia_2026-03-23
-6,류코노스톡/무발효여과물,Leuconostoc/Radish Root Ferment Filtrate,,,,kcia,2026-03-23,kcia_2026-03-23
-5,류신,Leucine,328-39-2(DL-) 61-90-5(L-),,,kcia,2026-03-23,kcia_2026-03-23
-4,루핀아미노산,Lupine Amino Acids,,,,kcia,2026-03-23,kcia_2026-03-23
-3,구멍쇠미역추출물,Agarum Cribrosum Extract,,,,kcia,2026-03-23,kcia_2026-03-23
-2,가지열매추출물,Solanum Melongena (Eggplant) Fruit Extract,84012-19-1,가지추출물,,kcia,2026-03-23,kcia_2026-03-23
-1,가공소금,,,,,kcia,2026-03-23,kcia_2026-03-23

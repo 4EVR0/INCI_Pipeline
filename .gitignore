@@ -13,3 +13,7 @@ venv/
 # mac
 .DS_Store
 EOF
+
+#data
+output/
+*.csv
