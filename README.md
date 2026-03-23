@@ -1,76 +1,191 @@
-# INCI_Data Pipeline
+# KCIA Ingredient ETL Pipeline
 
-화장품 성분 표준화를 위한 데이터
-KCIA 성분 사전과 CosIng 데이터베이스를 활용하여 **성분 정보 및 영문명 매핑 데이터를 구축**하는 것을 목표로 합니다.
+## 📌 Overview
 
----
+이 파이프라인은 KCIA(대한화장품협회) 공식 홈페이지에서 성분 데이터를 수집하여
 
-## 프로젝트 목적
+최소 전처리 후 **S3 Bronze Layer에 적재하는 ETL 파이프라인**입니다.
 
-화장품 성분 기반 추천 및 분석 시스템을 구축하기 위해
-신뢰할 수 있는 성분 데이터 소스를 수집하고 이를 데이터베이스 형태로 정리합니다.
-
-주요 목표는 다음과 같습니다.
-
-* KCIA 성분 사전 데이터 수집
-* CosIng 데이터 기반 영문 성분명 확보
-* KCIA ↔ CosIng 성분 매핑
-* 성분 데이터 파이프라인 구축
+- 실행 주기: 월 1회 (예정)
+- 데이터 특성: 준정적 reference data
+- 출력: S3 Bronze (raw snapshot)
 
 ---
 
-## 데이터 출처
+## 🏗️ Architecture
 
-### 1. KCIA (대한화장품협회 성분사전)
+Extract → Transform → Validate → Load (S3 Bronze)
 
-* 화장품법 기준 표준 성분명 제공
-* 한글 및 영문 성분명 제공
-* 성분 코드 기반 데이터 관리
-
-### 2. CosIng (EU Cosmetic Ingredient Database)
-
-* EU 화장품 성분 데이터베이스
-* 성분 영문명 및 기능 정보 제공
+- Extract: KCIA 웹사이트 크롤링
+- Transform: 최소 전처리 (Bronze 기준)
+- Validate: 데이터 품질 검증
+- Load: S3 업로드
 
 ---
 
-## 디렉터리 구조
+## 📂 Directory Structure
 
 ```
-INCI_data
- ├── KCIA
- │   └── KCIA_crawler
- │       ├── app.py
- │       ├── crawler.py
- │       └── requirements.txt
- ├── CosIng          # (추후 추가 예정)
- └── README.md
+kcia_pipeline/
+	    |-	app.py
+  		|-	config.py
+	  	|-  models.py
+			|-  extract.py
+			|-  transform.py
+			|-  validate.py
+			|-  load_s3.py
+			|-  http_client.py
+			|-  parser.py
+utils/
+		logging_utils.py
 ```
 
 ---
 
-## 현재 구현 상태
+## 📄 File Description
 
-* KCIA 성분 사전 크롤러 구현
-* 성분 데이터 수집 및 저장 로직 구현
+### 🔹 app.py
+
+파이프라인의 엔트리포인트
+
+- 전체 ETL 파이프라인 실행
+- 실행 순서:
+    1. extract
+    2. transform
+    3. validate
+    4. save local
+    5. upload S3
 
 ---
 
-## 향후 개발 계획
+### 🔹 config.py
 
-* CosIng 데이터 수집 모듈 추가
-* KCIA ↔ CosIng 성분명 매핑 로직 구현
-* 데이터베이스 적재 파이프라인 구축
-* 성분 데이터 기반 분석 및 추천 시스템 연계
+환경 변수 및 설정 관리
+
+- `.env` 또는 환경변수에서 설정 로드
+- 주요 설정:
+    - KCIA_BASE_URL
+    - S3_BUCKET
+    - S3_PREFIX
+    - ingest_date
+    - batch_id
 
 ---
 
-## 실행 방법
+### 🔹 models.py
 
-KCIA 크롤러 실행 예시
+데이터 구조 정의
 
+- `KciaRawRow`: 파싱 직후 원본 데이터
+- `KciaBronzeRow`: Bronze 적재용 데이터
+- `CrawlStats`: 크롤링 통계
+- `ValidationResult`: 검증 결과
+
+---
+
+### 🔹 extract.py
+
+데이터 수집 (Extract 단계)
+
+- KCIA 전체 페이지 크롤링
+- 페이지네이션 처리
+- HTML → RawRow 변환
+- 반환:
+    - raw rows
+    - crawl stats
+
+---
+
+### 🔹 transform.py
+
+최소 전처리 (Transform 단계)
+
+- 공백 제거
+- NULL 정리
+- 중복 제거 (ingredient_code 기준)
+- 메타 컬럼 추가:
+    - source
+    - ingest_date
+    - batch_id
+
+👉 Bronze 레이어이므로 최소한의 변환만 수행
+
+---
+
+### 🔹 valid.py
+
+데이터 검증
+
+- row 수 0 여부 확인
+- total count 일치 여부 확인
+- (optional) strict mode 지원
+
+👉 배치 파이프라인 안정성 확보 목적
+
+---
+
+### 🔹 load_s3.py
+
+S3 업로드
+
+- boto3 기반 업로드
+- 최종 CSV → S3 Bronze 저장
+s3://{bucket}/bronze/raw/kcia/ingest_date=YYYY-MM-DD/kcia.csv
+
+---
+
+### 🔹 http_client.py
+
+HTTP 요청 모듈
+
+- requests 기반
+- retry / timeout 처리
+- user-agent 설정
+- 안정적인 크롤링 지원
+
+---
+
+### 🔹 parser.py
+
+HTML 파싱 로직
+
+- 총 건수 파싱
+- 결과 테이블 탐색
+- row 추출 및 구조화
+- KCIA 페이지 구조에 맞춘 전용 파서
+
+---
+
+### 🔹 utils/logging_utils.py
+
+로깅 설정
+
+- 표준 logging wrapper
+- timestamp + level + module 출력
+- 중복 handler 방지
+
+---
+## ⚙️ Environment Variables
 ```
-python app.py
+KCIA_BASE_URL=https://kcia.or.kr/cid/search/ingd_list.php
+S3_BUCKET=your-bucket-name
+S3_PREFIX=INCI_data/kcia
+
+REQUEST_SLEEP=0.3
+TIMEOUT=15
+MAX_RETRIES=5
+STRICT_COUNT_CHECK=true
 ```
 
 ---
+## 🚀 How to Run
+```bash
+python -m kcia_pipeline.app
+```
+
+## 📊 Output
+- Local
+output/kcia_YYYY-MM-DD.csv
+
+- S3
+bronze/raw/kcia/ingest_date=YYYY-MM-DD/kcia.csv
