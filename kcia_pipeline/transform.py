@@ -1,5 +1,5 @@
 from typing import List
-from models import KciaRawRow, KciaBronzeRow
+from kcia_pipeline.models import KciaRawRow, KciaBronzeRow
 
 
 def clean_str(s):
