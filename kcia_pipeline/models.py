@@ -7,8 +7,8 @@ class KciaRawRow:
     ingredient_code: str
     std_name_ko: Optional[str]
     std_name_en: Optional[str]
+    cas_no: Optional[str]
     old_name_ko: Optional[str]
-    old_name_en: Optional[str]
     as_of_date: Optional[str]
 
 
@@ -17,8 +17,8 @@ class KciaBronzeRow:
     ingredient_code: str
     std_name_ko: Optional[str]
     std_name_en: Optional[str]
+    cas_no: Optional[str]
     old_name_ko: Optional[str]
-    old_name_en: Optional[str]
     as_of_date: Optional[str]
 
     source: str
