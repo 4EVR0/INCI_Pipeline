@@ -35,7 +35,10 @@ def find_result_table(soup: BeautifulSoup):
 
     for t in tables:
         header_text = normalize_text(t.get_text(" ", strip=True))
-        if any(k in header_text for k in ["성분코드", "국문명", "영문명", "INCI", "코드"]):
+        if any(
+            k in header_text
+            for k in ["성분코드", "국문명", "영문명", "INCI", "코드", "CAS No", "구명칭"]
+        ):
             best = t
             break
 
@@ -58,7 +61,10 @@ def parse_page_rows(html: str) -> List[KciaRawRow]:
             continue
 
         row_text = normalize_text(" ".join(c.get_text(" ", strip=True) for c in cols))
-        if any(h in row_text for h in ["성분코드", "국문명", "영문명", "INCI", "번호"]):
+        if any(
+            h in row_text
+            for h in ["성분코드", "국문명", "영문명", "INCI", "번호", "CAS No", "구명칭"]
+        ):
             continue
 
         cells = [normalize_text(c.get_text(" ", strip=True)) for c in cols]
@@ -69,10 +75,10 @@ def parse_page_rows(html: str) -> List[KciaRawRow]:
         if not re.fullmatch(r"\d+", code_str):
             continue
 
-        std_name_ko = cells[1] if len(cells) > 1 else None
-        std_name_en = cells[2] if len(cells) > 2 else None
-        old_name_ko = cells[3] if len(cells) > 3 and cells[3] else None
-        old_name_en = cells[4] if len(cells) > 4 and cells[4] else None
+        std_name_ko = cells[1] if len(cells) > 1 and cells[1] else None
+        std_name_en = cells[2] if len(cells) > 2 and cells[2] else None
+        cas_no = cells[3] if len(cells) > 3 and cells[3] else None
+        old_name_ko = cells[4] if len(cells) > 4 and cells[4] else None
 
         as_of_date = None
         for c in cells[5:]:
@@ -85,8 +91,8 @@ def parse_page_rows(html: str) -> List[KciaRawRow]:
                 ingredient_code=code_str,
                 std_name_ko=std_name_ko,
                 std_name_en=std_name_en,
+                cas_no=cas_no,
                 old_name_ko=old_name_ko,
-                old_name_en=old_name_en,
                 as_of_date=as_of_date,
             )
         )
