@@ -15,5 +15,6 @@ venv/
 EOF
 
 #data
+data/
 output/
 *.csv

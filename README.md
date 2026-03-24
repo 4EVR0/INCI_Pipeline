@@ -1,191 +1,215 @@
-# KCIA Ingredient ETL Pipeline
+# 📦 INCI Data Pipeline (KCIA + CosIng)
 
 ## 📌 Overview
 
-이 파이프라인은 KCIA(대한화장품협회) 공식 홈페이지에서 성분 데이터를 수집하여
+본 파이프라인은 화장품 성분 데이터(KCIA, CosIng)를 수집하고,
 
-최소 전처리 후 **S3 Bronze Layer에 적재하는 ETL 파이프라인**입니다.
+이를 **Medallion Architecture 기반 데이터 레이크(S3)**에 적재하는 ETL 파이프라인입니다.
 
-- 실행 주기: 월 1회 (예정)
-- 데이터 특성: 준정적 reference data
-- 출력: S3 Bronze (raw snapshot)
+- 데이터 소스:
+    - **KCIA (대한화장품협회)** –*국내 성분 데이터
+    - **CosIng (EU)** –*글로벌 성분 데이터
+- 실행 주기: 월 1회 (준정적 reference 데이터)
+- 목적:
+    - 성분 통합 데이터셋 구축
+    - 이후 **매핑 / Graph / RAG 시스템** 활용
 
 ---
 
 ## 🏗️ Architecture
 
-Extract → Transform → Validate → Load (S3 Bronze)
-
-- Extract: KCIA 웹사이트 크롤링
-- Transform: 최소 전처리 (Bronze 기준)
-- Validate: 데이터 품질 검증
-- Load: S3 업로드
-
----
-
-## 📂 Directory Structure
-
 ```
-kcia_pipeline/
-	    |-	app.py
-  		|-	config.py
-	  	|-  models.py
-			|-  extract.py
-			|-  transform.py
-			|-  validate.py
-			|-  load_s3.py
-			|-  http_client.py
-			|-  parser.py
-utils/
-		logging_utils.py
+[ KCIA Website ]        [ CosIng API ]
+        ↓                      ↓
+     Extract                Extract
+        ↓                      ↓
+     Transform            Query Splitting
+        ↓                      ↓
+     Validate             Raw Collection
+        ↓                      ↓
+        └──────→ [ Bronze Layer (S3) ] ←──────┘
+                           ↓
+                    (Future)
+                        ↓
+                  Silver (Dedup / Mapping)
+                        ↓
+                  Gold (Analytics / Graph)
 ```
 
 ---
 
-## 📄 File Description
+## 🧱 Medallion Architecture
 
-### 🔹 app.py
+### 🟤 Bronze Layer
 
-파이프라인의 엔트리포인트
+- Raw 데이터 저장
+- 최소 전처리만 수행
+- 데이터 원본 최대 보존
 
-- 전체 ETL 파이프라인 실행
-- 실행 순서:
-    1. extract
-    2. transform
-    3. validate
-    4. save local
-    5. upload S3
-
----
-
-### 🔹 config.py
-
-환경 변수 및 설정 관리
-
-- `.env` 또는 환경변수에서 설정 로드
-- 주요 설정:
-    - KCIA_BASE_URL
-    - S3_BUCKET
-    - S3_PREFIX
-    - ingest_date
-    - batch_id
+| Source | 특징 |
+| --- | --- |
+| KCIA | 중복 제거 포함된 정형 데이터 |
+| CosIng | query overlap으로 중복 포함 가능 |
 
 ---
 
-### 🔹 models.py
+### ⚪ Silver Layer (Planned)
 
-데이터 구조 정의
-
-- `KciaRawRow`: 파싱 직후 원본 데이터
-- `KciaBronzeRow`: Bronze 적재용 데이터
-- `CrawlStats`: 크롤링 통계
-- `ValidationResult`: 검증 결과
+- CosIng deduplication (`substance_id` 기준)
+- KCIA ↔ CosIng 매핑
+- 데이터 정규화
 
 ---
 
-### 🔹 extract.py
+### 🟡 Gold Layer (Planned)
 
-데이터 수집 (Extract 단계)
-
-- KCIA 전체 페이지 크롤링
-- 페이지네이션 처리
-- HTML → RawRow 변환
-- 반환:
-    - raw rows
-    - crawl stats
+- 분석용 데이터셋
+- Graph 기반 구조
+- RAG / 검색 시스템 활용
 
 ---
 
-### 🔹 transform.py
+## ⚙️ Key Features
 
-최소 전처리 (Transform 단계)
+### 1. Multi-source ETL Pipeline
 
-- 공백 제거
-- NULL 정리
-- 중복 제거 (ingredient_code 기준)
-- 메타 컬럼 추가:
-    - source
-    - ingest_date
-    - batch_id
-
-👉 Bronze 레이어이므로 최소한의 변환만 수행
+- 서로 다른 구조의 데이터 소스 처리:
+    - HTML 크롤링 (KCIA)
+    - REST API (CosIng)
 
 ---
 
-### 🔹 valid.py
+### 2. Query Splitting (CosIng 핵심)
 
-데이터 검증
+CosIng API는 최대 약 10,000 rows 제한 존재
 
-- row 수 0 여부 확인
-- total count 일치 여부 확인
-- (optional) strict mode 지원
-
-👉 배치 파이프라인 안정성 확보 목적
-
----
-
-### 🔹 load_s3.py
-
-S3 업로드
-
-- boto3 기반 업로드
-- 최종 CSV → S3 Bronze 저장
-s3://{bucket}/bronze/raw/kcia/ingest_date=YYYY-MM-DD/kcia.csv
-
----
-
-### 🔹 http_client.py
-
-HTTP 요청 모듈
-
-- requests 기반
-- retry / timeout 처리
-- user-agent 설정
-- 안정적인 크롤링 지원
-
----
-
-### 🔹 parser.py
-
-HTML 파싱 로직
-
-- 총 건수 파싱
-- 결과 테이블 탐색
-- row 추출 및 구조화
-- KCIA 페이지 구조에 맞춘 전용 파서
-
----
-
-### 🔹 utils/logging_utils.py
-
-로깅 설정
-
-- 표준 logging wrapper
-- timestamp + level + module 출력
-- 중복 handler 방지
-
----
-## ⚙️ Environment Variables
 ```
+p* → pa*, pb*, pc* ...
+```
+
+- prefix 기반 분할
+- SAFE_LIMIT 이하로 재귀 분할
+- 데이터 유실 방지
+
+---
+
+### 3. Data Validation (KCIA)
+
+- row 수 검증
+- 페이지 수 검증
+- strict mode 지원
+
+👉 안정적인 배치 파이프라인 보장
+
+---
+
+### 4. Count Cache (CosIng)
+
+- query별 count 결과 캐싱
+- API 호출 수 감소
+- 성능 최적화
+
+---
+
+### 5. S3 Data Lake 적재
+
+```
+s3://{bucket}/bronze/
+    ├── kcia/
+    │   └── ingest_date=YYYY-MM-DD/
+    │       └── kcia.csv
+    │
+    └── cosing/
+        └── YYYY-MM-DD/
+            └── cosing_bronze.csv
+```
+
+---
+
+## 📁 Project Structure
+
+```
+INCI_data/
+│
+├── kcia_pipeline/
+│   ├── app.py
+│   ├── config.py
+│   ├── models.py
+│   ├── extract.py
+│   ├── transform.py
+│   ├── validate.py
+│   ├── load_s3.py
+│   ├── http_client.py
+│   ├── parser.py
+│
+├── cosing_pipeline/
+│   ├── app.py
+│   ├── config.py
+│   ├── logging_utils.py
+│   │
+│   ├── extract/
+│   │   ├── extract.py
+│   │   ├── client.py
+│   │   ├── splitter.py
+│   │   ├── parser.py
+│   │   └── collector.py
+│   │
+│   ├── transform/
+│   │   └── transform.py
+│   │
+│   ├── s3_loader.py
+│   │
+│   └── utils/
+│       └── utils.py
+│
+└── utils/
+    └── logging_utils.py
+```
+
+---
+
+## 🔑 Environment Variables
+
+```
+# 공통
+S3_BUCKET=your-bucket
+AWS_ACCESS_KEY_ID=your-key
+AWS_SECRET_ACCESS_KEY=your-secret
+
+# KCIA
 KCIA_BASE_URL=https://kcia.or.kr/cid/search/ingd_list.php
-S3_BUCKET=your-bucket-name
-S3_PREFIX=INCI_data/kcia
 
+# CosIng
+COSING_API_KEY=your-api-key
+
+# 옵션
+COSING_SAFE_LIMIT=9500
+COSING_PAGE_SIZE=100
 REQUEST_SLEEP=0.3
-TIMEOUT=15
-MAX_RETRIES=5
-STRICT_COUNT_CHECK=true
 ```
 
 ---
-## 🚀 How to Run
-```bash
-python -m kcia_pipeline.app
+
+## ▶️ How to Run
+
+```
+# KCIA
+python-m kcia_pipeline.app
+
+# CosIng
+python-m cosing_pipeline.app
 ```
 
-## 📊 Output
-- Local
-output/kcia_YYYY-MM-DD.csv
+---
 
-- S3
-bronze/raw/kcia/ingest_date=YYYY-MM-DD/kcia.csv
+## 📊 Data Characteristics
+
+### KCIA
+
+- 약 21,000+ rows
+- 중복 제거된 정형 데이터
+
+### CosIng
+
+- 약 30,000+ unique substances
+- Bronze 기준 중복 포함 가능 (query overlap)

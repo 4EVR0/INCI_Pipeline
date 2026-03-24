@@ -34,13 +34,13 @@ def get_settings() -> Settings:
     return Settings(
         kcia_base_url=kcia_base_url,
         s3_bucket=s3_bucket,
-        s3_prefix=os.getenv("S3_PREFIX", "bronze/raw/kcia"),
-        request_sleep=float(os.getenv("REQUEST_SLEEP", "0.3")),
-        timeout=int(os.getenv("TIMEOUT", "15")),
-        max_retries=int(os.getenv("MAX_RETRIES", "5")),
+        s3_prefix=os.getenv("KCIA_S3_PREFIX", "INCI_data/kcia"),
+        request_sleep=float(os.getenv("KCIA_REQUEST_SLEEP", "0.3")),
+        timeout=int(os.getenv("KCIA_TIMEOUT", "15")),
+        max_retries=int(os.getenv("KCIA_MAX_RETRIES", "5")),
         ingest_date=ingest_date,
         batch_id=f"kcia_{ingest_date}",
-        strict_count_check=os.getenv("STRICT_COUNT_CHECK", "true").lower() == "true",
+        strict_count_check=os.getenv("KCIA_STRICT_COUNT_CHECK", "true").lower() == "true",
         user_agent=(
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
         "AppleWebKit/537.36 (KHTML, like Gecko) "
