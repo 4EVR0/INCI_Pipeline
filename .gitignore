@@ -16,11 +16,8 @@ logs/
 EOF
 
 #data
+output/
+dev_data/
 bronze/
 silver/
-silver_mapping/data/
-dev_data/
-*.csv
-
-#test
-test.py
+silver_mapping/data
