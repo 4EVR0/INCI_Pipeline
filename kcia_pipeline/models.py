@@ -23,6 +23,7 @@ class KciaBronzeRow:
 
     source: str
     ingest_date: str
+    batch_month: str
     batch_id: str
 
 

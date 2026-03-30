@@ -13,7 +13,14 @@ def validate_bronze(df: pd.DataFrame, stats: ExtractionStats, settings) -> Valid
             f"Raw result count and transformed row count differ: {stats.raw_result_count} != {len(df)}",
         )
 
-    required_columns = ["inci_name", "item_type", "source", "ingest_date", "batch_id"]
+    required_columns = [
+        "inci_name",
+        "item_type",
+        "source",
+        "ingest_date",
+        "batch_month",
+        "batch_id",
+    ]
     missing = [c for c in required_columns if c not in df.columns]
     if missing:
         return ValidationResult(False, f"Missing required columns: {missing}")

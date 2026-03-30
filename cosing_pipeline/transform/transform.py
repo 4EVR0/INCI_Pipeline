@@ -25,6 +25,7 @@ def transform_to_bronze(raw_pages: List[Dict[str, Any]], settings) -> pd.DataFra
             row_copy["sort"] = parsed.get("sort")
             row_copy["source"] = "cosing"
             row_copy["ingest_date"] = settings.ingest_date
+            row_copy["batch_month"] = settings.batch_month
             row_copy["batch_id"] = settings.batch_id
             rows.append(row_copy)
 
@@ -33,7 +34,6 @@ def transform_to_bronze(raw_pages: List[Dict[str, Any]], settings) -> pd.DataFra
     if df.empty:
         return df
 
-    # Bronze minimum cleanup only
     object_columns = df.select_dtypes(include=["object"]).columns
     for col in object_columns:
         df[col] = df[col].apply(lambda x: x.strip() if isinstance(x, str) else x)
