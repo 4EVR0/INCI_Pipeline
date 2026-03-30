@@ -71,12 +71,12 @@ Bronze Layer는 다음 원칙을 따른다:
 ### 4. S3 업로드
 
 - 수집된 데이터를 CSV 형태로 변환
-- 날짜 기준으로 S3에 저장
+- Batch_Month 기준으로 S3에 저장
 
 예시:
 
 ```
-s3://bucket/bronze/cosing/2026-03-24/cosing_bronze.csv
+s3://bucket/INCI_data/cosing/Batch=YYYY-MM/cosing_bronze.csv
 ```
 
 ---
