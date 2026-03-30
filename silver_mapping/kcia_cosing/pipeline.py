@@ -100,10 +100,15 @@ class KCIACosIngSilverMapper:
             "cosing_batch_id",
             "match_type",
             "match_score",
+            "review_decision",
+            "review_reason",
+            "candidate_score",
+            "candidate_inci_name",
         ]
 
         cur = self.kcia.copy()
-        matched_frames = []
+        matched_frames: list[pd.DataFrame] = []
+        review_frames: list[pd.DataFrame] = []
 
         for left_key, right_key, match_type, right_df in [
             ("key_cas", "key_cas", "exact_cas", cosing_cas),
@@ -114,8 +119,10 @@ class KCIACosIngSilverMapper:
             ("key_sorted_strict", "key_sorted_strict", "exact_word_sorted_strict", cosing_sorted_strict),
         ]:
             cur = cur.drop(columns=[c for c in base_drop_cols if c in cur.columns], errors="ignore")
-            matched, cur = exact_match(cur, right_df, left_key, right_key, match_type)
+            matched, review_conflict, cur = exact_match(cur, right_df, left_key, right_key, match_type)
             matched_frames.append(matched)
+            if not review_conflict.empty:
+                review_frames.append(review_conflict)
 
         fuzzy_auto, fuzzy_review, final_unmatched = fuzzy_match_dataframe(
             unmatched_df=cur,
@@ -126,17 +133,19 @@ class KCIACosIngSilverMapper:
         )
 
         matched_final = pd.concat([*matched_frames, fuzzy_auto], ignore_index=True)
+        fuzzy_review_all = pd.concat([*review_frames, fuzzy_review], ignore_index=True)
+
         matched_final = self._standardize_final_matched(matched_final)
-        fuzzy_review = self._standardize_fuzzy_review(fuzzy_review)
+        fuzzy_review_all = self._standardize_fuzzy_review(fuzzy_review_all)
         final_unmatched = self._standardize_unmatched(final_unmatched)
         graphrag_map = self._build_graphrag_map(matched_final)
 
         return {
             "matched_final": normalize_output_nulls(matched_final),
-            "fuzzy_review": normalize_output_nulls(fuzzy_review),
+            "fuzzy_review": normalize_output_nulls(fuzzy_review_all),
             "final_unmatched": normalize_output_nulls(final_unmatched),
             "graphrag_map": normalize_output_nulls(graphrag_map),
-            "mapping_summary": self.build_summary(matched_final, fuzzy_review, final_unmatched),
+            "mapping_summary": self.build_summary(matched_final, fuzzy_review_all, final_unmatched),
         }
 
     def _standardize_final_matched(self, df: pd.DataFrame) -> pd.DataFrame:
@@ -179,7 +188,10 @@ class KCIACosIngSilverMapper:
     def _standardize_fuzzy_review(self, df: pd.DataFrame) -> pd.DataFrame:
         out = df.copy()
         out = out.rename(columns={"cas_no": "kcia_cas_no", "substance_id": "cosing_substance_id"})
-        out["candidate_inci_name"] = out.get("inci_name", "")
+
+        if "candidate_inci_name" not in out.columns:
+            out["candidate_inci_name"] = out.get("inci_name", "")
+
         keep_cols = [
             "ingredient_code",
             "std_name_ko",
@@ -196,6 +208,7 @@ class KCIACosIngSilverMapper:
             "identified_ingredient",
             "status",
             "review_decision",
+            "review_reason",
             "fuzzy_key_review",
         ]
         for col in keep_cols:
@@ -230,23 +243,37 @@ class KCIACosIngSilverMapper:
     ) -> pd.DataFrame:
         assert self.kcia is not None
         assert self.cosing is not None
+
+        kcia_total = len(self.kcia)
+        cosing_total = len(self.cosing)
+        matched_total = len(matched_final)
+        unmatched_total = len(final_unmatched)
+        review_total = len(fuzzy_review)
+
+        accounted_total = matched_total + unmatched_total + review_total
+        missing_total = kcia_total - accounted_total
+
         summary = pd.DataFrame(
             [
                 {
                     **self.input_meta,
-                    "kcia_total": len(self.kcia),
-                    "cosing_total": len(self.cosing),
-                    "matched_final_total": len(matched_final),
-                    "unmatched_kcia_total": len(final_unmatched),
-                    "fuzzy_review_total": len(fuzzy_review),
-                    "match_rate_vs_kcia": round(len(matched_final) / len(self.kcia) * 100, 2),
+                    "kcia_total": kcia_total,
+                    "cosing_total": cosing_total,
+                    "matched_final_total": matched_total,
+                    "unmatched_kcia_total": unmatched_total,
+                    "fuzzy_review_total": review_total,
+                    "accounted_total": accounted_total,
+                    "missing_total": missing_total,
+                    "match_rate_vs_kcia": round(matched_total / kcia_total * 100, 2) if kcia_total else 0.0,
+                    "coverage_excluding_review": round((matched_total + unmatched_total) / kcia_total * 100, 2) if kcia_total else 0.0,
+                    "coverage_including_review": round(accounted_total / kcia_total * 100, 2) if kcia_total else 0.0,
                     "fuzzy_auto_threshold": self.settings.fuzzy_auto_threshold,
                     "fuzzy_review_threshold": self.settings.fuzzy_review_threshold,
                 }
             ]
         )
         return summary
-
+    
 
 def run_and_save(settings: Settings) -> dict[str, Path]:
     mapper = KCIACosIngSilverMapper(settings)

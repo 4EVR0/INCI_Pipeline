@@ -36,7 +36,7 @@ def fetch_html(
             return r.text
         except Exception as e:
             last_exc = e
-            sleep_s = min(2 ** attempt, 20) + random.uniform(0, 0.7)
+            sleep_s = min(2**attempt, 20) + random.uniform(0, 0.7)
             time.sleep(sleep_s)
 
     raise RuntimeError(f"Failed after {max_retries} retries: {last_exc}")

@@ -16,4 +16,5 @@ EOF
 
 #data
 output/
+data/
 *.csv

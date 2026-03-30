@@ -1,5 +1,6 @@
 from typing import List
-from kcia_pipeline.models import KciaRawRow, KciaBronzeRow
+
+from kcia_pipeline.models import KciaBronzeRow, KciaRawRow
 
 
 def clean_str(s):
@@ -29,6 +30,7 @@ def transform_to_bronze(raw_rows: List[KciaRawRow], settings):
                 as_of_date=clean_str(r.as_of_date),
                 source="kcia",
                 ingest_date=settings.ingest_date,
+                batch_month=settings.batch_month,
                 batch_id=settings.batch_id,
             )
         )
