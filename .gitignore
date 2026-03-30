@@ -8,6 +8,7 @@ venv/
 .env
 
 # logs
+logs/
 *.log
 
 # mac
@@ -15,6 +16,11 @@ venv/
 EOF
 
 #data
-output/
-data/
+bronze/
+silver/
+silver_mapping/data/
+dev_data/
 *.csv
+
+#test
+test.py

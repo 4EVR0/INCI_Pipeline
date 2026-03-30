@@ -34,6 +34,9 @@ class Settings:
     s3_prefix: str
     strict_validation: bool
 
+    resume_enabled: bool
+    clear_checkpoint_on_success: bool
+
 
 def _validate_batch_month(batch_month: str) -> str:
     if not re.fullmatch(r"\d{4}-\d{2}", batch_month):
@@ -104,4 +107,8 @@ def get_settings() -> Settings:
         s3_bucket=s3_bucket,
         s3_prefix=os.getenv("COSING_S3_PREFIX", "INCI_data/cosing"),
         strict_validation=os.getenv("COSING_STRICT_VALIDATION", "true").lower() == "true",
+        resume_enabled=os.getenv("COSING_RESUME_ENABLED", "true").lower() == "true",
+        clear_checkpoint_on_success=os.getenv(
+            "COSING_CLEAR_CHECKPOINT_ON_SUCCESS", "true"
+        ).lower() == "true",
     )

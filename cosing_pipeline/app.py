@@ -46,6 +46,13 @@ def build_cosing_bronze_metadata(
     }
 
 
+def _clear_checkpoint_files(output_dir):
+    for name in ["checkpoint_state.json", "raw_pages_checkpoint.jsonl"]:
+        path = output_dir / name
+        if path.exists():
+            path.unlink()
+
+
 def main():
     settings = get_settings()
     logger.info("Starting CosIng Bronze pipeline")
@@ -107,6 +114,11 @@ def main():
     logger.info("Uploaded to S3: s3://%s/%s", settings.s3_bucket, s3_csv_key)
     logger.info("Uploaded to S3: s3://%s/%s", settings.s3_bucket, s3_parquet_key)
     logger.info("Uploaded to S3: s3://%s/%s", settings.s3_bucket, s3_metadata_key)
+
+    if settings.clear_checkpoint_on_success:
+        _clear_checkpoint_files(settings.output_dir)
+        logger.info("Checkpoint files removed after successful completion")
+
     logger.info("CosIng Bronze pipeline completed")
 
 

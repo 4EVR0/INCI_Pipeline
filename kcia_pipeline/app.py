@@ -26,6 +26,13 @@ def save_csv(rows, path):
             writer.writerow(asdict(row))
 
 
+def _clear_checkpoint_files(paths) -> None:
+    if paths.checkpoint_state_path.exists():
+        paths.checkpoint_state_path.unlink()
+    if paths.checkpoint_rows_path.exists():
+        paths.checkpoint_rows_path.unlink()
+
+
 def main():
     settings = get_settings()
     paths = get_kcia_bronze_paths(
@@ -39,7 +46,11 @@ def main():
     logger.info("Local CSV path: %s", paths.local_csv_path)
     logger.info("S3 CSV key: %s", paths.s3_csv_key)
 
-    raw_rows, stats = extract_all(settings)
+    raw_rows, stats = extract_all(
+        settings,
+        checkpoint_state_path=paths.checkpoint_state_path,
+        checkpoint_rows_path=paths.checkpoint_rows_path,
+    )
     logger.info("Extracted rows: %s", len(raw_rows))
 
     bronze_rows = transform_to_bronze(raw_rows, settings)
@@ -75,6 +86,10 @@ def main():
 
     upload_json(metadata, settings.s3_bucket, paths.s3_metadata_key)
     logger.info("Uploaded metadata to S3: %s", paths.s3_metadata_key)
+
+    if settings.clear_checkpoint_on_success:
+        _clear_checkpoint_files(paths)
+        logger.info("Checkpoint files removed after successful completion")
 
     logger.info("Pipeline completed successfully")
 

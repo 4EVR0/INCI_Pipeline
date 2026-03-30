@@ -14,6 +14,8 @@ class BronzePaths:
     local_dir: Path
     local_csv_path: Path
     local_metadata_path: Path
+    checkpoint_state_path: Path
+    checkpoint_rows_path: Path
     s3_dir: str
     s3_csv_key: str
     s3_metadata_key: str
@@ -38,6 +40,8 @@ def build_bronze_paths(
     local_dir = local_root / batch_dir_name
     local_csv_path = local_dir / file_name
     local_metadata_path = local_dir / "metadata.json"
+    checkpoint_state_path = local_dir / "checkpoint_state.json"
+    checkpoint_rows_path = local_dir / "raw_rows_checkpoint.jsonl"
 
     clean_prefix = s3_prefix.rstrip("/")
     s3_dir = f"{clean_prefix}/{batch_dir_name}"
@@ -50,6 +54,8 @@ def build_bronze_paths(
         local_dir=local_dir,
         local_csv_path=local_csv_path,
         local_metadata_path=local_metadata_path,
+        checkpoint_state_path=checkpoint_state_path,
+        checkpoint_rows_path=checkpoint_rows_path,
         s3_dir=s3_dir,
         s3_csv_key=s3_csv_key,
         s3_metadata_key=s3_metadata_key,

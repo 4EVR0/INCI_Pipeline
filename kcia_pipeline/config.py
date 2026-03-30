@@ -25,6 +25,9 @@ class Settings:
     strict_count_check: bool
     user_agent: str
 
+    resume_enabled: bool
+    clear_checkpoint_on_success: bool
+
 
 def _validate_batch_month(batch_month: str) -> str:
     if not re.fullmatch(r"\d{4}-\d{2}", batch_month):
@@ -80,4 +83,8 @@ def get_settings() -> Settings:
             "AppleWebKit/537.36 (KHTML, like Gecko) "
             "Chrome/122.0.0.0 Safari/537.36",
         ),
+        resume_enabled=os.getenv("KCIA_RESUME_ENABLED", "true").lower() == "true",
+        clear_checkpoint_on_success=os.getenv(
+            "KCIA_CLEAR_CHECKPOINT_ON_SUCCESS", "true"
+        ).lower() == "true",
     )
