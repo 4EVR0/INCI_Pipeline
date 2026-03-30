@@ -22,7 +22,7 @@ def _read_csv(path: Path, usecols=None) -> pd.DataFrame:
     return pd.read_csv(path, dtype=str, usecols=usecols).fillna("")
 
 
-def _latest_s3_key(bucket: str, prefix: str, client, ingest_date: Optional[str] = None) -> str:
+def _latest_s3_key(bucket: str, prefix: str, client, batch_month: Optional[str] = None) -> str:
     paginator = client.get_paginator("list_objects_v2")
     candidates = []
     for page in paginator.paginate(Bucket=bucket, Prefix=prefix):
@@ -30,11 +30,13 @@ def _latest_s3_key(bucket: str, prefix: str, client, ingest_date: Optional[str] 
             key = item["Key"]
             if not key.lower().endswith(".csv"):
                 continue
-            if ingest_date and f"ingest_date={ingest_date}" not in key and ingest_date not in key:
+            if batch_month and f"batch={batch_month}" not in key:
                 continue
             candidates.append((key, item["LastModified"]))
     if not candidates:
-        raise FileNotFoundError(f"S3에서 CSV를 찾지 못했습니다. bucket={bucket}, prefix={prefix}, ingest_date={ingest_date}")
+        raise FileNotFoundError(
+            f"S3에서 CSV를 찾지 못했습니다. bucket={bucket}, prefix={prefix}, batch_month={batch_month}"
+        )
     candidates.sort(key=lambda x: x[1], reverse=True)
     return candidates[0][0]
 
@@ -48,10 +50,10 @@ def _download_from_s3(bucket: str, key: str, local_path: Path, region_name: str)
 
 
 def locate_inputs(settings: Settings) -> tuple[LocatedInput, LocatedInput]:
-    if settings.input_mode == "local":
+    if settings.input_mode == "bronze_local":
         return (
-            LocatedInput(source="local", path=settings.kcia_local_path),
-            LocatedInput(source="local", path=settings.cosing_local_path),
+            LocatedInput(source="bronze_local", path=settings.kcia_local_path),
+            LocatedInput(source="bronze_local", path=settings.cosing_local_path),
         )
 
     if settings.input_mode != "s3":
@@ -64,16 +66,16 @@ def locate_inputs(settings: Settings) -> tuple[LocatedInput, LocatedInput]:
         bucket=settings.s3_bucket,
         prefix=settings.kcia_s3_prefix,
         client=s3,
-        ingest_date=settings.kcia_ingest_date,
+        batch_month=settings.batch_month,
     )
     cosing_key = _latest_s3_key(
         bucket=settings.s3_bucket,
         prefix=settings.cosing_s3_prefix,
         client=s3,
-        ingest_date=settings.cosing_ingest_date,
+        batch_month=settings.batch_month,
     )
 
-    cache_dir = settings.data_dir / "cache"
+    cache_dir = settings.base_dir / "silver_mapping" / "cache"
     kcia_local = cache_dir / Path(kcia_key).name
     cosing_local = cache_dir / Path(cosing_key).name
 
@@ -94,12 +96,12 @@ def load_kcia_csv(path: Path) -> pd.DataFrame:
     if missing:
         raise ValueError(f"KCIA CSV에 필요한 컬럼이 없습니다: {missing}")
 
-    optional_cols = ["old_name_ko", "as_of_date", "source", "ingest_date", "batch_id"]
+    optional_cols = ["old_name_ko", "as_of_date", "source", "ingest_date", "batch_month", "batch_id"]
     for col in optional_cols:
         if col not in df.columns:
             df[col] = ""
 
-    for col in [required_cols + optional_cols][0]:
+    for col in required_cols + optional_cols:
         df[col] = df[col].astype(str)
 
     return df.copy()
@@ -117,6 +119,7 @@ def load_cosing_csv(path: Path) -> pd.DataFrame:
         "status": ["status"],
         "source": ["source"],
         "ingest_date": ["ingest_date"],
+        "batch_month": ["batch_month"],
         "batch_id": ["batch_id"],
     }
 

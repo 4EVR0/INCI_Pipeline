@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+
 import numpy as np
 import pandas as pd
 from rapidfuzz import fuzz, process
@@ -18,6 +20,12 @@ COSING_KEEP_COLS = [
     "ingest_date",
     "batch_id",
 ]
+
+CAS_PATTERN = re.compile(r"\b\d{2,7}-\d{2}-\d\b")
+CAS_OVERLAP_ENABLED_MATCH_TYPES = {
+    "exact_basic",
+    "exact_full_normalized",
+}
 
 
 def deduplicate_cosing(df: pd.DataFrame, key_col: str) -> pd.DataFrame:
@@ -46,6 +54,33 @@ def _rename_kcia_meta_cols(df: pd.DataFrame) -> pd.DataFrame:
     if "batch_id" in out.columns:
         out = out.rename(columns={"batch_id": "kcia_batch_id"})
     return out
+
+
+def _extract_cas_set(value) -> set[str]:
+    if pd.isna(value):
+        return set()
+    return set(CAS_PATTERN.findall(str(value)))
+
+
+def _has_cas_overlap(kcia_cas_raw, cosing_cas_raw) -> bool:
+    kcia_set = _extract_cas_set(kcia_cas_raw)
+    cosing_set = _extract_cas_set(cosing_cas_raw)
+    return len(kcia_set & cosing_set) > 0
+
+
+def _build_match_type_series(
+    df: pd.DataFrame,
+    base_match_type: str,
+    accepted_mask: pd.Series,
+    overlap_mask: pd.Series,
+) -> pd.Series:
+    match_type = pd.Series("", index=df.index, dtype="object")
+    match_type.loc[accepted_mask] = base_match_type
+
+    if base_match_type in CAS_OVERLAP_ENABLED_MATCH_TYPES:
+        match_type.loc[overlap_mask] = f"{base_match_type}_cas_overlap"
+
+    return match_type
 
 
 def _split_by_cas_consistency(
@@ -80,17 +115,38 @@ def _split_by_cas_consistency(
 
     has_match = out["inci_name"].ne("")
 
-    kcia_cas = out["key_cas"].fillna("").astype(str).str.strip()
-    cosing_cas = out["cosing_cas_no"].fillna("").astype(str).str.strip()
+    kcia_cas_norm = out["key_cas"].fillna("").astype(str).str.strip()
+    cosing_cas_norm = out["cosing_cas_no"].fillna("").astype(str).str.strip()
 
-    both_have_cas = kcia_cas.ne("") & cosing_cas.ne("")
-    cas_mismatch = has_match & both_have_cas & (kcia_cas != cosing_cas)
+    both_have_cas = kcia_cas_norm.ne("") & cosing_cas_norm.ne("")
+    cas_exact_match = both_have_cas & (kcia_cas_norm == cosing_cas_norm)
 
-    out["match_type"] = np.where(has_match & ~cas_mismatch, match_type, "")
-    out["match_score"] = np.where(has_match & ~cas_mismatch, 100.0, np.nan)
+    if match_type in CAS_OVERLAP_ENABLED_MATCH_TYPES:
+        cas_overlap = pd.Series(
+            [
+                _has_cas_overlap(kcia_raw, cosing_raw)
+                for kcia_raw, cosing_raw in zip(out["cas_no"], out["cosing_cas_no"])
+            ],
+            index=out.index,
+        )
+    else:
+        cas_overlap = pd.Series(False, index=out.index)
 
-    accepted = out[has_match & ~cas_mismatch].copy()
-    cas_conflict_review = out[cas_mismatch].copy()
+    cas_overlap_match = has_match & both_have_cas & ~cas_exact_match & cas_overlap
+    cas_conflict = has_match & both_have_cas & ~cas_exact_match & ~cas_overlap
+
+    accepted_mask = has_match & ~cas_conflict
+
+    out["match_type"] = _build_match_type_series(
+        df=out,
+        base_match_type=match_type,
+        accepted_mask=accepted_mask,
+        overlap_mask=cas_overlap_match,
+    )
+    out["match_score"] = np.where(accepted_mask, 100.0, np.nan)
+
+    accepted = out[accepted_mask].copy()
+    cas_conflict_review = out[cas_conflict].copy()
     unmatched = out[~has_match].copy()
 
     if not cas_conflict_review.empty:
@@ -168,6 +224,7 @@ def fuzzy_match_dataframe(
     review_threshold: int,
 ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     work = unmatched_df.loc[:, ~unmatched_df.columns.duplicated()].copy()
+
     drop_cols = [
         c
         for c in COSING_KEEP_COLS + ["cosing_cas_no", "match_type", "match_score"]
@@ -206,7 +263,7 @@ def fuzzy_match_dataframe(
         how="left",
     )
 
-    # fuzzy auto도 CAS 충돌이면 자동 승인 금지
+    # fuzzy auto는 기존처럼 보수적으로 유지
     auto["inci_name"] = auto["inci_name"].fillna("")
     auto["cosing_cas_no"] = auto["cosing_cas_no"].fillna("")
     auto["key_cas"] = auto["key_cas"].fillna("")

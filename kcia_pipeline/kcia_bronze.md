@@ -185,7 +185,7 @@ python -m kcia_pipeline.app
 
 ## 📊 Output
 - Local
-output/kcia_YYYY-MM-DD.csv
+bronze/kcia/Batch=YYYY-MM/kcia_bronze.csv
 
 - S3
-bronze/raw/kcia/ingest_date=YYYY-MM-DD/kcia.csv
+Inci_data/kcia/Batch=YYYY-MM/kcia_bronze.csv

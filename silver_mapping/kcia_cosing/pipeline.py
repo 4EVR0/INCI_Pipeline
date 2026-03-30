@@ -273,18 +273,21 @@ class KCIACosIngSilverMapper:
             ]
         )
         return summary
-    
+
 
 def run_and_save(settings: Settings) -> dict[str, Path]:
     mapper = KCIACosIngSilverMapper(settings)
     results = mapper.run()
 
+    batch_dir = settings.output_dir / f"batch={settings.batch_month}"
+    batch_dir.mkdir(parents=True, exist_ok=True)
+
     output_paths = {
-        "matched_final": settings.output_dir / "kcia_cosing_matched_final.csv",
-        "graphrag_map": settings.output_dir / "kcia_cosing_graphrag_map.csv",
-        "fuzzy_review": settings.output_dir / "kcia_cosing_fuzzy_review_latest.csv",
-        "final_unmatched": settings.output_dir / "kcia_cosing_unmatched_final.csv",
-        "mapping_summary": settings.output_dir / "mapping_summary.csv",
+        "matched_final": batch_dir / "kcia_cosing_matched_final.csv",
+        "graphrag_map": batch_dir / "kcia_cosing_graphrag_map.csv",
+        "fuzzy_review": batch_dir / "kcia_cosing_fuzzy_review_latest.csv",
+        "final_unmatched": batch_dir / "kcia_cosing_unmatched_final.csv",
+        "mapping_summary": batch_dir / "mapping_summary.csv",
     }
 
     for key, path in output_paths.items():
