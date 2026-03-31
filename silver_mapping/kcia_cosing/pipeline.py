@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
@@ -15,6 +17,7 @@ from .io import (
 )
 from .matcher import deduplicate_cosing, exact_match, fuzzy_match_dataframe
 from .normalizer import build_name_keys, normalize_cas
+from .s3_io import upload_file, upload_json
 
 
 GRAPH_RAG_COLS = [
@@ -275,14 +278,68 @@ class KCIACosIngSilverMapper:
         return summary
 
 
-def run_and_save(settings: Settings) -> dict[str, Path]:
+def _build_s3_prefix(settings: Settings) -> str:
+    base_prefix = os.getenv("S3_SILVER_PREFIX", "silver").rstrip("/")
+    return f"{base_prefix}/kcia_cosing/batch={settings.batch_month}"
+
+
+def _upload_outputs_to_s3(output_paths: dict[str, Path], settings: Settings) -> dict[str, str]:
+    bucket = os.getenv("S3_BUCKET")
+    if not bucket:
+        raise ValueError("S3_BUCKET environment variable is required.")
+
+    s3_prefix = _build_s3_prefix(settings)
+
+    uploaded: dict[str, str] = {}
+    for name, local_path in output_paths.items():
+        s3_key = f"{s3_prefix}/{local_path.name}"
+        uploaded[name] = upload_file(local_path, bucket, s3_key)
+
+    return uploaded
+
+
+def _write_manifest_and_success(
+    settings: Settings,
+    s3_output_paths: dict[str, str],
+) -> dict[str, str]:
+    bucket = os.getenv("S3_BUCKET")
+    if not bucket:
+        raise ValueError("S3_BUCKET environment variable is required.")
+
+    s3_prefix = _build_s3_prefix(settings)
+    now_utc = datetime.now(timezone.utc).isoformat()
+
+    manifest = {
+        "pipeline": "kcia_cosing_silver_mapping",
+        "batch_month": settings.batch_month,
+        "generated_at_utc": now_utc,
+        "outputs": s3_output_paths,
+    }
+
+    success_payload = {
+        "status": "SUCCESS",
+        "pipeline": "kcia_cosing_silver_mapping",
+        "batch_month": settings.batch_month,
+        "generated_at_utc": now_utc,
+    }
+
+    manifest_uri = upload_json(manifest, bucket, f"{s3_prefix}/manifest.json")
+    success_uri = upload_json(success_payload, bucket, f"{s3_prefix}/_SUCCESS.json")
+
+    return {
+        "manifest": manifest_uri,
+        "_SUCCESS": success_uri,
+    }
+
+
+def run_and_save(settings: Settings) -> dict[str, object]:
     mapper = KCIACosIngSilverMapper(settings)
     results = mapper.run()
 
     batch_dir = settings.output_dir / f"batch={settings.batch_month}"
     batch_dir.mkdir(parents=True, exist_ok=True)
 
-    output_paths = {
+    local_output_paths: dict[str, Path] = {
         "matched_final": batch_dir / "kcia_cosing_matched_final.csv",
         "graphrag_map": batch_dir / "kcia_cosing_graphrag_map.csv",
         "fuzzy_review": batch_dir / "kcia_cosing_fuzzy_review_latest.csv",
@@ -290,7 +347,14 @@ def run_and_save(settings: Settings) -> dict[str, Path]:
         "mapping_summary": batch_dir / "mapping_summary.csv",
     }
 
-    for key, path in output_paths.items():
+    for key, path in local_output_paths.items():
         write_csv(results[key], path)
 
-    return output_paths
+    s3_output_paths = _upload_outputs_to_s3(local_output_paths, settings)
+    meta_paths = _write_manifest_and_success(settings, s3_output_paths)
+
+    return {
+        "local_paths": local_output_paths,
+        "s3_paths": s3_output_paths,
+        "meta_paths": meta_paths,
+    }
