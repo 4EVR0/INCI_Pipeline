@@ -74,6 +74,156 @@
 - RAG / 검색 시스템 활용
 
 ---
+## ▶️ How to Run
+
+### 0. Prerequisites
+
+- Python 3.12+
+- Docker / Docker Compose
+- `.env` file configured
+- dependencies installed from `requirements.txt`
+
+```bash
+pip install -r requirements.txt
+```
+
+---
+### 🔐 환경 설정
+
+이 프로젝트는 실행에 필요한 설정값을 `.env` 파일로 관리합니다.
+
+프로젝트를 실행하기 전에 먼저 예시 파일을 복사하여 `.env` 파일을 생성하세요.
+
+```bash
+cp .env.example .env
+```
+---
+
+#### 🔐 설정 1. 공통 AWS 인증 키 설정
+
+```bash
+# 공통
+AWS_ACCESS_KEY_ID=your-aws-access-key
+AWS_SECRET_ACCESS_KEY=your-aws-secret-key
+AWS_DEFAULT_REGION=ap-northeast-2
+S3_BUCKET=your-s3-bucket
+```
+
+---
+
+#### 🔐 설정 2. 배치 기준 날짜 설정
+
+```bash
+# 배치 기준 (필요 시, 직접 수정)
+BATCH_MONTH=YYYY-MM
+INGEST_DATE=YYYY-MM-DD
+
+# Silver 매핑용 로컬 입력 경로 (직접 입력)
+KCIA_LOCAL_PATH=bronze/kcia/batch=YYYY-MM/kcia_bronze.csv
+COSING_LOCAL_PATH=bronze/cosing/batch=YYYY-MM/cosing_bronze.csv
+```
+
+(미설정 시, 시스템 시간으로 자동 설정됩니다.)
+
+---
+
+#### 🔐 설정 3. CosIng API key
+
+```bash
+COSING_API_KEY=your-cosing-api-key
+```
+
+---
+
+### 1. Local 실행
+
+### 1-1. KCIA Bronze
+
+```bash
+python-m kcia_pipeline.app
+```
+
+Outputs:
+
+- `bronze/kcia/batch=YYYY-MM/kcia_bronze.csv`
+- `bronze/kcia/batch=YYYY-MM/metadata.json`
+
+### 1-2. CosIng Bronze
+
+```bash
+python-m cosing_pipeline.app
+```
+
+Outputs:
+
+- `bronze/cosing/batch=YYYY-MM/cosing_bronze.csv`
+- `bronze/cosing/batch=YYYY-MM/cosing_bronze.parquet`
+- `bronze/cosing/batch=YYYY-MM/metadata.json`
+
+### 1-3. KCIA ↔ CosIng Silver Mapping
+
+```bash
+python-m silver_mapping.kcia_cosing.run_mapping
+```
+
+Outputs:
+
+- `silver/kcia_cosing/batch=YYYY-MM/kcia_cosing_matched_final.csv`
+- `silver/kcia_cosing/batch=YYYY-MM/kcia_cosing_fuzzy_review_latest.csv`
+- `silver/kcia_cosing/batch=YYYY-MM/kcia_cosing_unmatched_final.csv`
+- `silver/kcia_cosing/batch=YYYY-MM/kcia_cosing_graphrag_map.csv`
+- `silver/kcia_cosing/batch=YYYY-MM/mapping_summary.csv`
+
+---
+
+### 2. Docker Execution
+
+#### Build
+
+```bash
+docker compose build
+```
+
+### 2-1. KCIA Bronze
+
+```bash
+docker compose run--rm bronze-kcia
+```
+
+### 2-2. CosIng Bronze
+
+```bash
+docker compose run--rm bronze-cosing
+```
+
+### 2-3. KCIA ↔ CosIng Silver Mapping
+
+```bash
+docker compose run--rm silver-mapping
+```
+
+---
+
+### 3. 추천 실행 순서
+
+### Local
+
+```bash
+python-m kcia_pipeline.app
+python-m cosing_pipeline.app
+python-m silver_mapping.kcia_cosing.run_mapping
+```
+
+### Docker
+
+```bash
+docker compose build
+docker compose run--rm bronze-kcia
+docker compose run--rm bronze-cosing
+docker compose run--rm silver-mapping
+```
+
+---
 
 ## ⚙️ Key Features
 
