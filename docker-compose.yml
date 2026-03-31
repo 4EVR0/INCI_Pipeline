@@ -1,0 +1,39 @@
+version: "3.9"
+
+x-common-env: &common-env
+  PYTHONUNBUFFERED: "1"
+  BATCH_MONTH: ${BATCH_MONTH:-2026-03}
+  AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+  AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+  AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-ap-northeast-2}
+  S3_BUCKET: ${S3_BUCKET:-}
+
+x-common-service: &common-service
+  build:
+    context: .
+    dockerfile: Dockerfile
+  image: inci-data-pipeline:latest
+  working_dir: /app
+  env_file:
+    - .env
+  environment:
+    <<: *common-env
+  volumes:
+    - ./:/app
+  restart: "no"
+
+services:
+  bronze-cosing:
+    <<: *common-service
+    container_name: bronze-cosing
+    command: ["python", "-m", "cosing_pipeline.app"]
+
+  bronze-kcia:
+    <<: *common-service
+    container_name: bronze-kcia
+    command: ["python", "-m", "kcia_pipeline.app"]
+
+  silver-mapping:
+    <<: *common-service
+    container_name: silver-mapping
+    command: ["python", "-m", "silver_mapping.kcia_cosing.run_mapping"]
