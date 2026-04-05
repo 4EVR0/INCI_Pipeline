@@ -15,5 +15,6 @@ __pycache__
 logs/
 bronze/
 silver/
+gold/
 
 dev_data/
