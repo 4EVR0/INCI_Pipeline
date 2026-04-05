@@ -25,7 +25,7 @@ class GoldSettings:
 
 def discover_latest_silver_matched_final(base_dir: Path) -> tuple[str, Path]:
     """silver/kcia_cosing/batch=YYYY-MM/kcia_cosing_matched_final.csv 중 가장 최근 배치."""
-    silver_root = base_dir / "silver" / "kcia_cosing"
+    silver_root = base_dir / "data" / "silver" / "kcia_cosing"
     if not silver_root.is_dir():
         raise FileNotFoundError(f"실버 루트가 없습니다: {silver_root}")
 
@@ -53,11 +53,11 @@ def discover_latest_silver_matched_final(base_dir: Path) -> tuple[str, Path]:
 
 
 def get_gold_settings() -> GoldSettings:
-    base_dir = Path(__file__).resolve().parent.parent.parent
+    base_dir = Path(__file__).resolve().parent.parent.parent.parent
 
     batch_month, silver_path = discover_latest_silver_matched_final(base_dir)
 
-    gold_output_dir = base_dir / "gold"
+    gold_output_dir = base_dir / "data" / "gold"
     gold_output_dir.mkdir(parents=True, exist_ok=True)
 
     return GoldSettings(

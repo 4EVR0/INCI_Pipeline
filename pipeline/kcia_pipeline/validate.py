@@ -1,4 +1,4 @@
-from kcia_pipeline.models import ValidationResult
+from pipeline.kcia_pipeline.models import ValidationResult
 
 
 def validate(rows, stats, settings):

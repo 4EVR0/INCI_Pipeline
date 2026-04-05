@@ -3,12 +3,12 @@ from dataclasses import asdict
 
 from common.metadata import build_kcia_bronze_metadata, write_json
 from common.paths import ensure_dir, get_kcia_bronze_paths
-from kcia_pipeline.config import get_settings
-from kcia_pipeline.extract import extract_all
-from kcia_pipeline.load_s3 import upload_file, upload_json
-from kcia_pipeline.transform import transform_to_bronze
-from kcia_pipeline.validate import validate
-from kcia_pipeline.utils.logging_utils import setup_logger
+from pipeline.kcia_pipeline.config import get_settings
+from pipeline.kcia_pipeline.extract import extract_all
+from pipeline.kcia_pipeline.load_s3 import upload_file, upload_json
+from pipeline.kcia_pipeline.transform import transform_to_bronze
+from pipeline.kcia_pipeline.validate import validate
+from pipeline.kcia_pipeline.utils.logging_utils import setup_logger
 
 logger = setup_logger()
 

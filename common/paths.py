@@ -33,7 +33,7 @@ def build_bronze_paths(
     local_root: Path | None = None,
 ) -> BronzePaths:
     if local_root is None:
-        local_root = PROJECT_ROOT / "bronze" / source
+        local_root = PROJECT_ROOT / "data" / "bronze" / source
 
     batch_dir_name = f"batch={batch_month}"
 

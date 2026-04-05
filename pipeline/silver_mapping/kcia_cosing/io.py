@@ -75,7 +75,7 @@ def locate_inputs(settings: Settings) -> tuple[LocatedInput, LocatedInput]:
         batch_month=settings.batch_month,
     )
 
-    cache_dir = settings.base_dir / "silver_mapping" / "cache"
+    cache_dir = settings.base_dir / "pipeline" / "silver_mapping" / "cache"
     kcia_local = cache_dir / Path(kcia_key).name
     cosing_local = cache_dir / Path(cosing_key).name
 

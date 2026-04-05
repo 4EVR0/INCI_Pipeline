@@ -3,10 +3,10 @@ import math
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-from cosing_pipeline.extract.client import CosIngClient
-from cosing_pipeline.extract.splitter import CosIngQuerySplitter
-from cosing_pipeline.models import ExtractionStats
-from cosing_pipeline.utils.logging_utils import setup_logger
+from pipeline.cosing_pipeline.extract.client import CosIngClient
+from pipeline.cosing_pipeline.extract.splitter import CosIngQuerySplitter
+from pipeline.cosing_pipeline.models import ExtractionStats
+from pipeline.cosing_pipeline.utils.logging_utils import setup_logger
 
 
 logger = setup_logger(__name__)

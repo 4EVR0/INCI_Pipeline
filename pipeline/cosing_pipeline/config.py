@@ -67,7 +67,7 @@ def get_settings() -> Settings:
     else:
         batch_month = _derive_batch_month(ingest_date)
 
-    project_root = Path(__file__).resolve().parent.parent
+    project_root = Path(__file__).resolve().parent.parent.parent
 
     api_url = os.getenv(
         "COSING_API_URL",
@@ -77,7 +77,7 @@ def get_settings() -> Settings:
     if not s3_bucket:
         raise ValueError("S3_BUCKET is not set")
 
-    output_dir = project_root / "bronze" / "cosing" / f"batch={batch_month}"
+    output_dir = project_root / "data" / "bronze" / "cosing" / f"batch={batch_month}"
     log_dir = project_root / "logs"
 
     output_dir.mkdir(parents=True, exist_ok=True)

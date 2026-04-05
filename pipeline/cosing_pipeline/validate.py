@@ -1,6 +1,6 @@
 import pandas as pd
 
-from cosing_pipeline.models import ExtractionStats, ValidationResult
+from pipeline.cosing_pipeline.models import ExtractionStats, ValidationResult
 
 
 def validate_bronze(df: pd.DataFrame, stats: ExtractionStats, settings) -> ValidationResult:

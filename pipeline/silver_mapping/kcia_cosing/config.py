@@ -51,16 +51,16 @@ def _derive_batch_month() -> str:
 
 
 def get_settings() -> Settings:
-    base_dir = Path(__file__).resolve().parent.parent.parent  # INCI_data
+    base_dir = Path(__file__).resolve().parent.parent.parent.parent  # INCI_data
     batch_month = _validate_batch_month(os.getenv("BATCH_MONTH") or _derive_batch_month())
 
-    output_dir = base_dir / "silver" / "kcia_cosing"
+    output_dir = base_dir / "data" / "silver" / "kcia_cosing"
     review_dir = output_dir / "review"
     output_dir.mkdir(parents=True, exist_ok=True)
     review_dir.mkdir(parents=True, exist_ok=True)
 
-    kcia_local_default = base_dir / "bronze" / "kcia" / f"batch={batch_month}" / "kcia_bronze.csv"
-    cosing_local_default = base_dir / "bronze" / "cosing" / f"batch={batch_month}" / "cosing_bronze.csv"
+    kcia_local_default = base_dir / "data" / "bronze" / "kcia" / f"batch={batch_month}" / "kcia_bronze.csv"
+    cosing_local_default = base_dir / "data" / "bronze" / "cosing" / f"batch={batch_month}" / "cosing_bronze.csv"
 
     return Settings(
         base_dir=base_dir,

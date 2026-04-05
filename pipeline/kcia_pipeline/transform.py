@@ -1,6 +1,6 @@
 from typing import List
 
-from kcia_pipeline.models import KciaBronzeRow, KciaRawRow
+from pipeline.kcia_pipeline.models import KciaBronzeRow, KciaRawRow
 
 
 def clean_str(s):

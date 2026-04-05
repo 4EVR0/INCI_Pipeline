@@ -4,7 +4,7 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
-from silver_mapping.kcia_cosing.s3_io import upload_file, upload_json
+from pipeline.silver_mapping.kcia_cosing.s3_io import upload_file, upload_json
 
 from .config import GoldSettings, get_gold_settings
 from .transform import load_matched_final_csv, transform_matched_final_to_gold

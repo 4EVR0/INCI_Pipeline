@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-from cosing_pipeline.utils.logging_utils import setup_logger
+from pipeline.cosing_pipeline.utils.logging_utils import setup_logger
 
 
 class CosIngQuerySplitter:

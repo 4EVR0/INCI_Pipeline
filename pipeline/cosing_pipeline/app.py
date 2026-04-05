@@ -1,10 +1,10 @@
 from common.metadata import write_json
-from cosing_pipeline.config import get_settings
-from cosing_pipeline.extract.extract import extract_all
-from cosing_pipeline.load_s3 import upload_file, upload_json
-from cosing_pipeline.transform.transform import transform_to_bronze
-from cosing_pipeline.utils.logging_utils import setup_logger
-from cosing_pipeline.validate import validate_bronze
+from pipeline.cosing_pipeline.config import get_settings
+from pipeline.cosing_pipeline.extract.extract import extract_all
+from pipeline.cosing_pipeline.load_s3 import upload_file, upload_json
+from pipeline.cosing_pipeline.transform.transform import transform_to_bronze
+from pipeline.cosing_pipeline.utils.logging_utils import setup_logger
+from pipeline.cosing_pipeline.validate import validate_bronze
 
 logger = setup_logger()
 

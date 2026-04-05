@@ -3,7 +3,7 @@ from typing import Any, Dict, List
 
 import pandas as pd
 
-from cosing_pipeline.transform.parser import parse_page
+from pipeline.cosing_pipeline.transform.parser import parse_page
 
 
 def transform_to_bronze(raw_pages: List[Dict[str, Any]], settings) -> pd.DataFrame:

@@ -6,10 +6,10 @@ from typing import Dict, List, Tuple
 
 import requests
 
-from kcia_pipeline.http_client import fetch_html
-from kcia_pipeline.models import CrawlStats, KciaRawRow
-from kcia_pipeline.parser import compute_total_pages, parse_page_rows
-from kcia_pipeline.utils.logging_utils import setup_logger
+from pipeline.kcia_pipeline.http_client import fetch_html
+from pipeline.kcia_pipeline.models import CrawlStats, KciaRawRow
+from pipeline.kcia_pipeline.parser import compute_total_pages, parse_page_rows
+from pipeline.kcia_pipeline.utils.logging_utils import setup_logger
 
 logger = setup_logger(__name__)
 

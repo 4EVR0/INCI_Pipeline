@@ -4,7 +4,7 @@ from typing import List, Optional, Tuple
 
 from bs4 import BeautifulSoup
 
-from kcia_pipeline.models import KciaRawRow
+from pipeline.kcia_pipeline.models import KciaRawRow
 
 
 def normalize_text(s: str) -> str:

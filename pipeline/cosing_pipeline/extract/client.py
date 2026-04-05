@@ -6,7 +6,7 @@ import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
-from cosing_pipeline.utils.logging_utils import setup_logger
+from pipeline.cosing_pipeline.utils.logging_utils import setup_logger
 
 
 class CosIngClient:
