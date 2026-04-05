@@ -28,19 +28,19 @@ services:
   bronze-cosing:
     <<: *common-service
     container_name: bronze-cosing
-    command: ["python", "-m", "cosing_pipeline.app"]
+    command: ["python", "-m", "pipeline.cosing_pipeline.app"]
 
   bronze-kcia:
     <<: *common-service
     container_name: bronze-kcia
-    command: ["python", "-m", "kcia_pipeline.app"]
+    command: ["python", "-m", "pipeline.kcia_pipeline.app"]
 
   silver-mapping:
     <<: *common-service
     container_name: silver-mapping
-    command: ["python", "-m", "silver_mapping.kcia_cosing.run_mapping"]
+    command: ["python", "-m", "pipeline.silver_mapping.kcia_cosing.run_mapping"]
 
   gold-pipeline:
     <<: *common-service
     container_name: gold-pipeline
-    command: ["python", "-m", "gold_pipeline.kcia_cosing.run_gold"]
+    command: ["python", "-m", "pipeline.gold_pipeline.kcia_cosing.run_gold"]
