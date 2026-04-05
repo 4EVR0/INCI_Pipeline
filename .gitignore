@@ -13,7 +13,6 @@ logs/
 
 # mac
 .DS_Store
-EOF
 
 #data
 output/
@@ -21,3 +20,4 @@ dev_data/
 bronze/
 silver/
 silver_mapping/data
+gold/
