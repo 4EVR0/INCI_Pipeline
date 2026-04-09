@@ -62,6 +62,13 @@ def get_settings() -> Settings:
     kcia_local_default = base_dir / "data" / "bronze" / "kcia" / f"batch={batch_month}" / "kcia_bronze.csv"
     cosing_local_default = base_dir / "data" / "bronze" / "cosing" / f"batch={batch_month}" / "cosing_bronze.csv"
 
+    fuzzy_auto = int(os.getenv("FUZZY_AUTO_THRESHOLD", "95"))
+    fuzzy_review = int(os.getenv("FUZZY_REVIEW_THRESHOLD", "90"))
+    if fuzzy_review >= fuzzy_auto:
+        raise ValueError(
+            f"FUZZY_REVIEW_THRESHOLD({fuzzy_review})는 FUZZY_AUTO_THRESHOLD({fuzzy_auto})보다 작아야 합니다."
+        )
+
     return Settings(
         base_dir=base_dir,
         output_dir=output_dir,
@@ -74,7 +81,7 @@ def get_settings() -> Settings:
         kcia_s3_prefix=os.getenv("KCIA_S3_PREFIX", "INCI_data/kcia"),
         cosing_s3_prefix=os.getenv("COSING_S3_PREFIX", "INCI_data/cosing"),
         aws_region=os.getenv("AWS_DEFAULT_REGION", "ap-northeast-2"),
-        fuzzy_auto_threshold=int(os.getenv("FUZZY_AUTO_THRESHOLD", "95")),
-        fuzzy_review_threshold=int(os.getenv("FUZZY_REVIEW_THRESHOLD", "90")),
+        fuzzy_auto_threshold=fuzzy_auto,
+        fuzzy_review_threshold=fuzzy_review,
         save_intermediate=_to_bool(os.getenv("SAVE_INTERMEDIATE", "true"), default=True),
     )

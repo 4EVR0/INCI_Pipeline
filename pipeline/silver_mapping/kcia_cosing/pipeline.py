@@ -141,7 +141,7 @@ class KCIACosIngSilverMapper:
         matched_final = self._standardize_final_matched(matched_final)
         fuzzy_review_all = self._standardize_fuzzy_review(fuzzy_review_all)
         final_unmatched = self._standardize_unmatched(final_unmatched)
-        graphrag_map = self._build_graphrag_map(matched_final)
+        graphrag_map = self._build_graphrag_map(matched_final, final_unmatched)
 
         return {
             "matched_final": normalize_output_nulls(matched_final),
@@ -213,6 +213,13 @@ class KCIACosIngSilverMapper:
             "review_decision",
             "review_reason",
             "fuzzy_key_review",
+            "cosing_source",
+            "cosing_ingest_date",
+            "cosing_batch_id",
+            "kcia_source",
+            "kcia_ingest_date",
+            "kcia_batch_id",
+            "as_of_date",
         ]
         for col in keep_cols:
             if col not in out.columns:
@@ -234,9 +241,24 @@ class KCIACosIngSilverMapper:
                 out[col] = ""
         return out[keep_cols].rename(columns={"cas_no": "kcia_cas_no"})
 
-    def _build_graphrag_map(self, matched_final: pd.DataFrame) -> pd.DataFrame:
-        out = matched_final.copy()
-        return out[GRAPH_RAG_COLS].copy()
+    def _build_graphrag_map(self, matched_final: pd.DataFrame, final_unmatched: pd.DataFrame) -> pd.DataFrame:
+        unmatched_for_map = final_unmatched.copy()
+        unmatched_for_map["canonical_inci_name"] = None
+        unmatched_for_map["cosing_substance_id"] = None
+        unmatched_for_map["cosing_cas_no"] = None
+        unmatched_for_map["function_names"] = None
+        unmatched_for_map["cosmetic_restriction"] = None
+        unmatched_for_map["other_restrictions"] = None
+        unmatched_for_map["identified_ingredient"] = None
+        unmatched_for_map["status"] = None
+        unmatched_for_map["match_type"] = "kcia_only"
+        unmatched_for_map["match_score"] = None
+
+        combined = pd.concat([matched_final, unmatched_for_map], ignore_index=True)
+        for col in GRAPH_RAG_COLS:
+            if col not in combined.columns:
+                combined[col] = None
+        return combined[GRAPH_RAG_COLS].copy()
 
     def build_summary(
         self,

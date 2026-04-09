@@ -104,13 +104,16 @@ def normalize_word_sorted_strict(name: str) -> str:
     return " ".join(tokens)
 
 
+CAS_PATTERN = re.compile(r"\b\d{2,7}-\d{2}-\d\b")
+
+
 def normalize_cas(value: str) -> str:
     text = safe_str(value)
     text = text.replace("CAS No.", "").replace("CAS No", "").strip()
     if text.lower() in INVALID_NULL_LIKE:
         return ""
-    text = re.sub(r"\s+", "", text)
-    return text
+    matches = CAS_PATTERN.findall(text)
+    return matches[0] if matches else ""
 
 
 def build_name_keys(series: pd.Series) -> pd.DataFrame:

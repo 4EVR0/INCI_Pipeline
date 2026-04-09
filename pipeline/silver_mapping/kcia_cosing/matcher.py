@@ -269,9 +269,16 @@ def fuzzy_match_dataframe(
     auto["key_cas"] = auto["key_cas"].fillna("")
 
     both_have_cas = auto["key_cas"].astype(str).str.strip().ne("") & auto["cosing_cas_no"].astype(str).str.strip().ne("")
+    cas_overlap = pd.Series(
+        [
+            _has_cas_overlap(kcia_raw, cosing_raw)
+            for kcia_raw, cosing_raw in zip(auto["key_cas"], auto["cosing_cas_no"])
+        ],
+        index=auto.index,
+    )
     cas_mismatch = both_have_cas & (
         auto["key_cas"].astype(str).str.strip() != auto["cosing_cas_no"].astype(str).str.strip()
-    )
+    ) & ~cas_overlap
 
     auto_accepted = auto[~cas_mismatch].copy()
     auto_accepted["match_type"] = "fuzzy_auto"
