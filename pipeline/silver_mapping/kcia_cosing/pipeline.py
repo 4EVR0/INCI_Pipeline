@@ -36,6 +36,7 @@ GRAPH_RAG_COLS = [
     "status",
     "match_type",
     "match_score",
+    "is_fuzzy",
 ]
 
 
@@ -141,7 +142,7 @@ class KCIACosIngSilverMapper:
         matched_final = self._standardize_final_matched(matched_final)
         fuzzy_review_all = self._standardize_fuzzy_review(fuzzy_review_all)
         final_unmatched = self._standardize_unmatched(final_unmatched)
-        graphrag_map = self._build_graphrag_map(matched_final, final_unmatched)
+        graphrag_map = self._build_graphrag_map(matched_final, fuzzy_review_all, final_unmatched)
 
         return {
             "matched_final": normalize_output_nulls(matched_final),
@@ -241,7 +242,21 @@ class KCIACosIngSilverMapper:
                 out[col] = ""
         return out[keep_cols].rename(columns={"cas_no": "kcia_cas_no"})
 
-    def _build_graphrag_map(self, matched_final: pd.DataFrame, final_unmatched: pd.DataFrame) -> pd.DataFrame:
+    def _build_graphrag_map(
+        self,
+        matched_final: pd.DataFrame,
+        fuzzy_review: pd.DataFrame,
+        final_unmatched: pd.DataFrame,
+    ) -> pd.DataFrame:
+        matched = matched_final.copy()
+        matched["is_fuzzy"] = matched["match_type"].str.startswith("fuzzy")
+
+        fuzzy_for_map = fuzzy_review.copy()
+        fuzzy_for_map["canonical_inci_name"] = fuzzy_for_map["candidate_inci_name"] if "candidate_inci_name" in fuzzy_for_map.columns else None
+        fuzzy_for_map["match_score"] = fuzzy_for_map["candidate_score"] if "candidate_score" in fuzzy_for_map.columns else None
+        fuzzy_for_map["match_type"] = fuzzy_for_map["review_reason"] if "review_reason" in fuzzy_for_map.columns else "fuzzy_review"
+        fuzzy_for_map["is_fuzzy"] = True
+
         unmatched_for_map = final_unmatched.copy()
         unmatched_for_map["canonical_inci_name"] = None
         unmatched_for_map["cosing_substance_id"] = None
@@ -253,8 +268,9 @@ class KCIACosIngSilverMapper:
         unmatched_for_map["status"] = None
         unmatched_for_map["match_type"] = "kcia_only"
         unmatched_for_map["match_score"] = None
+        unmatched_for_map["is_fuzzy"] = False
 
-        combined = pd.concat([matched_final, unmatched_for_map], ignore_index=True)
+        combined = pd.concat([matched, fuzzy_for_map, unmatched_for_map], ignore_index=True)
         for col in GRAPH_RAG_COLS:
             if col not in combined.columns:
                 combined[col] = None
