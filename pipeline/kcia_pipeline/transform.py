@@ -32,6 +32,8 @@ def transform_to_bronze(raw_rows: List[KciaRawRow], settings):
                 ingest_date=settings.ingest_date,
                 batch_month=settings.batch_month,
                 batch_id=settings.batch_id,
+                batch_job=settings.batch_job,
+                batch_date=settings.batch_date.isoformat(),
             )
         )
 

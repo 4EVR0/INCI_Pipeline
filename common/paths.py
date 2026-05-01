@@ -11,6 +11,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 class BronzePaths:
     source: str
     batch_month: str
+    batch_job: str
     local_dir: Path
     local_csv_path: Path
     local_metadata_path: Path
@@ -28,6 +29,7 @@ def ensure_dir(path: Path) -> None:
 def build_bronze_paths(
     source: str,
     batch_month: str,
+    batch_job: str,
     s3_prefix: str,
     file_name: str,
     local_root: Path | None = None,
@@ -35,7 +37,7 @@ def build_bronze_paths(
     if local_root is None:
         local_root = PROJECT_ROOT / "data" / "bronze" / source
 
-    batch_dir_name = f"batch={batch_month}"
+    batch_dir_name = f"batch_job={batch_job}"
 
     local_dir = local_root / batch_dir_name
     local_csv_path = local_dir / file_name
@@ -51,6 +53,7 @@ def build_bronze_paths(
     return BronzePaths(
         source=source,
         batch_month=batch_month,
+        batch_job=batch_job,
         local_dir=local_dir,
         local_csv_path=local_csv_path,
         local_metadata_path=local_metadata_path,
@@ -62,10 +65,11 @@ def build_bronze_paths(
     )
 
 
-def get_kcia_bronze_paths(batch_month: str, s3_prefix: str) -> BronzePaths:
+def get_kcia_bronze_paths(batch_month: str, batch_job: str, s3_prefix: str) -> BronzePaths:
     return build_bronze_paths(
         source="kcia",
         batch_month=batch_month,
+        batch_job=batch_job,
         s3_prefix=s3_prefix,
         file_name="kcia_bronze.csv",
     )

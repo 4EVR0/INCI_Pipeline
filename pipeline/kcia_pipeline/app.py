@@ -8,6 +8,7 @@ from pipeline.kcia_pipeline.extract import extract_all
 from pipeline.kcia_pipeline.load_s3 import upload_file, upload_json
 from pipeline.kcia_pipeline.transform import transform_to_bronze
 from pipeline.kcia_pipeline.validate import validate
+from pipeline.kcia_pipeline.write_iceberg import write_kcia_bronze_to_iceberg
 from pipeline.kcia_pipeline.utils.logging_utils import setup_logger
 
 logger = setup_logger()
@@ -37,6 +38,7 @@ def main():
     settings = get_settings()
     paths = get_kcia_bronze_paths(
         batch_month=settings.batch_month,
+        batch_job=settings.batch_job,
         s3_prefix=settings.s3_prefix,
     )
 
@@ -70,6 +72,7 @@ def main():
         batch_month=settings.batch_month,
         ingest_date=settings.ingest_date,
         batch_id=settings.batch_id,
+        batch_job=settings.batch_job,
         row_count=len(bronze_rows),
         total_expected=stats.total_expected,
         total_collected=stats.total_collected,
@@ -86,6 +89,9 @@ def main():
 
     upload_json(metadata, settings.s3_bucket, paths.s3_metadata_key)
     logger.info("Uploaded metadata to S3: %s", paths.s3_metadata_key)
+
+    write_kcia_bronze_to_iceberg(bronze_rows, settings)
+    logger.info("Iceberg write completed: batch_job=%s", settings.batch_job)
 
     if settings.clear_checkpoint_on_success:
         _clear_checkpoint_files(paths)

@@ -18,6 +18,7 @@ from .io import (
 from .matcher import deduplicate_cosing, exact_match, fuzzy_match_dataframe
 from .normalizer import build_name_keys, normalize_cas
 from .s3_io import upload_file, upload_json
+from .write_iceberg import write_silver_to_iceberg
 
 
 GRAPH_RAG_COLS = [
@@ -318,7 +319,7 @@ class KCIACosIngSilverMapper:
 
 def _build_s3_prefix(settings: Settings) -> str:
     base_prefix = os.getenv("S3_SILVER_PREFIX", "silver").rstrip("/")
-    return f"{base_prefix}/kcia_cosing/batch={settings.batch_month}"
+    return f"{base_prefix}/kcia_cosing/batch_job={settings.batch_job}"
 
 
 def _upload_outputs_to_s3(output_paths: dict[str, Path], settings: Settings) -> dict[str, str]:
@@ -350,6 +351,7 @@ def _write_manifest_and_success(
     manifest = {
         "pipeline": "kcia_cosing_silver_mapping",
         "batch_month": settings.batch_month,
+        "batch_job": settings.batch_job,
         "generated_at_utc": now_utc,
         "outputs": s3_output_paths,
     }
@@ -358,6 +360,7 @@ def _write_manifest_and_success(
         "status": "SUCCESS",
         "pipeline": "kcia_cosing_silver_mapping",
         "batch_month": settings.batch_month,
+        "batch_job": settings.batch_job,
         "generated_at_utc": now_utc,
     }
 
@@ -370,11 +373,26 @@ def _write_manifest_and_success(
     }
 
 
+def _inject_batch_columns(results: dict[str, pd.DataFrame], settings: Settings) -> dict[str, pd.DataFrame]:
+    """matched_final, graphrag_map, fuzzy_review에 batch_job / batch_date 컬럼을 추가합니다."""
+    batch_job = settings.batch_job
+    batch_date = settings.batch_date.isoformat()
+
+    out = {}
+    for key, df in results.items():
+        enriched = df.copy()
+        enriched["batch_job"] = batch_job
+        enriched["batch_date"] = batch_date
+        out[key] = enriched
+    return out
+
+
 def run_and_save(settings: Settings) -> dict[str, object]:
     mapper = KCIACosIngSilverMapper(settings)
     results = mapper.run()
+    results = _inject_batch_columns(results, settings)
 
-    batch_dir = settings.output_dir / f"batch={settings.batch_month}"
+    batch_dir = settings.output_dir / f"batch_job={settings.batch_job}"
     batch_dir.mkdir(parents=True, exist_ok=True)
 
     local_output_paths: dict[str, Path] = {
@@ -390,6 +408,8 @@ def run_and_save(settings: Settings) -> dict[str, object]:
 
     s3_output_paths = _upload_outputs_to_s3(local_output_paths, settings)
     meta_paths = _write_manifest_and_success(settings, s3_output_paths)
+
+    write_silver_to_iceberg(results, settings)
 
     return {
         "local_paths": local_output_paths,
