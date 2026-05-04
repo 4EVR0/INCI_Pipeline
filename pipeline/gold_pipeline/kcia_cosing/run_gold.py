@@ -44,8 +44,6 @@ def run_gold_pipeline(settings: GoldSettings, upload_s3: bool = True) -> dict[st
         "success_uri": None,
     }
 
-    write_gold_to_iceberg(gold_df, settings)
-
     if not upload_s3:
         return result
 
@@ -81,6 +79,8 @@ def run_gold_pipeline(settings: GoldSettings, upload_s3: bool = True) -> dict[st
 
     meta_path = batch_dir / "manifest.json"
     meta_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    write_gold_to_iceberg(gold_df, settings)
 
     return result
 

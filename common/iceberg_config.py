@@ -45,7 +45,7 @@ class INCIIceberg:
         warehouse = os.getenv("ICEBERG_WAREHOUSE_PATH")
         if not warehouse:
             raise ValueError("ICEBERG_WAREHOUSE_PATH is not set")
-        return load_catalog(
+        catalog = load_catalog(
             INCIIceberg.CATALOG_NAME,
             **{
                 "type": "glue",
@@ -53,3 +53,6 @@ class INCIIceberg:
                 "s3.region": region,
             },
         )
+        if (INCIIceberg.DATABASE,) not in catalog.list_namespaces():
+            catalog.create_namespace(INCIIceberg.DATABASE)
+        return catalog
