@@ -25,6 +25,8 @@ class KciaBronzeRow:
     ingest_date: str
     batch_month: str
     batch_id: str
+    batch_job: str
+    batch_date: str  # ISO 8601 UTC, e.g. "2026-04-16T15:30:42+00:00"
 
 
 @dataclass

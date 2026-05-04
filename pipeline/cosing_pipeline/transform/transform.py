@@ -27,6 +27,8 @@ def transform_to_bronze(raw_pages: List[Dict[str, Any]], settings) -> pd.DataFra
             row_copy["ingest_date"] = settings.ingest_date
             row_copy["batch_month"] = settings.batch_month
             row_copy["batch_id"] = settings.batch_id
+            row_copy["batch_job"] = settings.batch_job
+            row_copy["batch_date"] = settings.batch_date.isoformat()
             rows.append(row_copy)
 
     df = pd.DataFrame(rows)

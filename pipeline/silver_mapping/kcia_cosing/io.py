@@ -22,7 +22,8 @@ def _read_csv(path: Path, usecols=None) -> pd.DataFrame:
     return pd.read_csv(path, dtype=str, usecols=usecols).fillna("")
 
 
-def _latest_s3_key(bucket: str, prefix: str, client, batch_month: Optional[str] = None) -> str:
+def _latest_s3_key(bucket: str, prefix: str, client) -> str:
+    """prefix 아래 CSV 중 LastModified 기준 가장 최신 파일 키를 반환합니다."""
     paginator = client.get_paginator("list_objects_v2")
     candidates = []
     for page in paginator.paginate(Bucket=bucket, Prefix=prefix):
@@ -30,12 +31,10 @@ def _latest_s3_key(bucket: str, prefix: str, client, batch_month: Optional[str] 
             key = item["Key"]
             if not key.lower().endswith(".csv"):
                 continue
-            if batch_month and f"batch={batch_month}" not in key:
-                continue
             candidates.append((key, item["LastModified"]))
     if not candidates:
         raise FileNotFoundError(
-            f"S3에서 CSV를 찾지 못했습니다. bucket={bucket}, prefix={prefix}, batch_month={batch_month}"
+            f"S3에서 CSV를 찾지 못했습니다. bucket={bucket}, prefix={prefix}"
         )
     candidates.sort(key=lambda x: x[1], reverse=True)
     return candidates[0][0]
@@ -66,13 +65,11 @@ def locate_inputs(settings: Settings) -> tuple[LocatedInput, LocatedInput]:
         bucket=settings.s3_bucket,
         prefix=settings.kcia_s3_prefix,
         client=s3,
-        batch_month=settings.batch_month,
     )
     cosing_key = _latest_s3_key(
         bucket=settings.s3_bucket,
         prefix=settings.cosing_s3_prefix,
         client=s3,
-        batch_month=settings.batch_month,
     )
 
     cache_dir = settings.base_dir / "pipeline" / "silver_mapping" / "cache"

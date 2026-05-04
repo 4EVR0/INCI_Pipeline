@@ -3,8 +3,9 @@ from pipeline.cosing_pipeline.config import get_settings
 from pipeline.cosing_pipeline.extract.extract import extract_all
 from pipeline.cosing_pipeline.load_s3 import upload_file, upload_json
 from pipeline.cosing_pipeline.transform.transform import transform_to_bronze
-from pipeline.cosing_pipeline.utils.logging_utils import setup_logger
 from pipeline.cosing_pipeline.validate import validate_bronze
+from pipeline.cosing_pipeline.write_iceberg import write_cosing_bronze_to_iceberg
+from pipeline.cosing_pipeline.utils.logging_utils import setup_logger
 
 logger = setup_logger()
 
@@ -14,6 +15,7 @@ def build_cosing_bronze_metadata(
     batch_month: str,
     ingest_date: str,
     batch_id: str,
+    batch_job: str,
     row_count: int,
     stats,
     local_csv_path: str,
@@ -28,6 +30,7 @@ def build_cosing_bronze_metadata(
         "batch_month": batch_month,
         "ingest_date": ingest_date,
         "batch_id": batch_id,
+        "batch_job": batch_job,
         "row_count": row_count,
         "extraction_stats": {
             "final_query_count": stats.final_query_count,
@@ -87,14 +90,15 @@ def main():
     logger.info("Saved locally: %s", local_csv)
     logger.info("Saved locally: %s", local_parquet)
 
-    s3_csv_key = f"{settings.s3_prefix}/batch={settings.batch_month}/cosing_bronze.csv"
-    s3_parquet_key = f"{settings.s3_prefix}/batch={settings.batch_month}/cosing_bronze.parquet"
-    s3_metadata_key = f"{settings.s3_prefix}/batch={settings.batch_month}/metadata.json"
+    s3_csv_key = f"{settings.s3_prefix}/batch_job={settings.batch_job}/cosing_bronze.csv"
+    s3_parquet_key = f"{settings.s3_prefix}/batch_job={settings.batch_job}/cosing_bronze.parquet"
+    s3_metadata_key = f"{settings.s3_prefix}/batch_job={settings.batch_job}/metadata.json"
 
     metadata = build_cosing_bronze_metadata(
         batch_month=settings.batch_month,
         ingest_date=settings.ingest_date,
         batch_id=settings.batch_id,
+        batch_job=settings.batch_job,
         row_count=len(df),
         stats=stats,
         local_csv_path=str(local_csv),
@@ -114,6 +118,9 @@ def main():
     logger.info("Uploaded to S3: s3://%s/%s", settings.s3_bucket, s3_csv_key)
     logger.info("Uploaded to S3: s3://%s/%s", settings.s3_bucket, s3_parquet_key)
     logger.info("Uploaded to S3: s3://%s/%s", settings.s3_bucket, s3_metadata_key)
+
+    write_cosing_bronze_to_iceberg(df, settings)
+    logger.info("Iceberg write completed: batch_job=%s", settings.batch_job)
 
     if settings.clear_checkpoint_on_success:
         _clear_checkpoint_files(settings.output_dir)

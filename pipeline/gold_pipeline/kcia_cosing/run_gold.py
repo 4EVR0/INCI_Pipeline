@@ -8,13 +8,14 @@ from pipeline.silver_mapping.kcia_cosing.s3_io import upload_file, upload_json
 
 from .config import GoldSettings, get_gold_settings
 from .transform import load_matched_final_csv, transform_matched_final_to_gold
+from .write_iceberg import write_gold_to_iceberg
 
 
 GOLD_CSV_NAME = "kcia_cosing_gold_ingredients.csv"
 
 
 def _gold_s3_prefix(settings: GoldSettings) -> str:
-    return f"{settings.s3_gold_prefix}/kcia_cosing/batch={settings.batch_month}"
+    return f"{settings.s3_gold_prefix}/kcia_cosing/batch_job={settings.batch_job}"
 
 
 def _write_csv(df, path: Path) -> None:
@@ -28,8 +29,10 @@ def run_gold_pipeline(settings: GoldSettings, upload_s3: bool = True) -> dict[st
 
     raw = load_matched_final_csv(settings.silver_matched_path)
     gold_df = transform_matched_final_to_gold(raw)
+    gold_df["batch_job"] = settings.batch_job
+    gold_df["batch_date"] = settings.batch_date.isoformat()
 
-    batch_dir = settings.gold_output_dir / f"batch={settings.batch_month}"
+    batch_dir = settings.gold_output_dir / f"batch_job={settings.batch_job}"
     local_csv = batch_dir / GOLD_CSV_NAME
     _write_csv(gold_df, local_csv)
 
@@ -40,6 +43,8 @@ def run_gold_pipeline(settings: GoldSettings, upload_s3: bool = True) -> dict[st
         "manifest_uri": None,
         "success_uri": None,
     }
+
+    write_gold_to_iceberg(gold_df, settings)
 
     if not upload_s3:
         return result
@@ -56,6 +61,7 @@ def run_gold_pipeline(settings: GoldSettings, upload_s3: bool = True) -> dict[st
     manifest = {
         "pipeline": "kcia_cosing_gold_ingredients",
         "batch_month": settings.batch_month,
+        "batch_job": settings.batch_job,
         "source_silver_csv": str(settings.silver_matched_path),
         "generated_at_utc": now_utc,
         "row_count": len(gold_df),
@@ -66,6 +72,7 @@ def run_gold_pipeline(settings: GoldSettings, upload_s3: bool = True) -> dict[st
         "status": "SUCCESS",
         "pipeline": "kcia_cosing_gold_ingredients",
         "batch_month": settings.batch_month,
+        "batch_job": settings.batch_job,
         "generated_at_utc": now_utc,
     }
     success_uri = upload_json(success_payload, settings.s3_bucket, f"{prefix}/_SUCCESS.json")

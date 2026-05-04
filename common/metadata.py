@@ -21,6 +21,7 @@ def build_kcia_bronze_metadata(
     batch_month: str,
     ingest_date: str,
     batch_id: str,
+    batch_job: str,
     row_count: int,
     total_expected: int,
     total_collected: int,
@@ -34,6 +35,7 @@ def build_kcia_bronze_metadata(
         "batch_month": batch_month,
         "ingest_date": ingest_date,
         "batch_id": batch_id,
+        "batch_job": batch_job,
         "row_count": row_count,
         "crawl_stats": {
             "total_expected": total_expected,

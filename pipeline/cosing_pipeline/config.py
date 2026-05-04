@@ -1,7 +1,7 @@
 import os
 import re
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -29,6 +29,8 @@ class Settings:
     ingest_date: str
     batch_month: str
     batch_id: str
+    batch_job: str
+    batch_date: datetime
 
     s3_bucket: str
     s3_prefix: str
@@ -77,7 +79,10 @@ def get_settings() -> Settings:
     if not s3_bucket:
         raise ValueError("S3_BUCKET is not set")
 
-    output_dir = project_root / "data" / "bronze" / "cosing" / f"batch={batch_month}"
+    now_utc = datetime.now(timezone.utc)
+    batch_job = now_utc.strftime("%Y%m%d_%H%M%S")
+
+    output_dir = project_root / "data" / "bronze" / "cosing" / f"batch_job={batch_job}"
     log_dir = project_root / "logs"
 
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -104,6 +109,8 @@ def get_settings() -> Settings:
         ingest_date=ingest_date,
         batch_month=batch_month,
         batch_id=f"cosing_{batch_month}",
+        batch_job=batch_job,
+        batch_date=now_utc,
         s3_bucket=s3_bucket,
         s3_prefix=os.getenv("COSING_S3_PREFIX", "INCI_data/cosing"),
         strict_validation=os.getenv("COSING_STRICT_VALIDATION", "true").lower() == "true",

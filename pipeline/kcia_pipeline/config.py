@@ -1,7 +1,7 @@
 import os
 import re
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 
 from dotenv import load_dotenv
 
@@ -21,6 +21,8 @@ class Settings:
     ingest_date: str
     batch_month: str
     batch_id: str
+    batch_job: str
+    batch_date: datetime
 
     strict_count_check: bool
     user_agent: str
@@ -66,6 +68,9 @@ def get_settings() -> Settings:
     if not s3_bucket:
         raise ValueError("S3_BUCKET is not set")
 
+    now_utc = datetime.now(timezone.utc)
+    batch_job = now_utc.strftime("%Y%m%d_%H%M%S")
+
     return Settings(
         kcia_base_url=kcia_base_url,
         s3_bucket=s3_bucket,
@@ -76,6 +81,8 @@ def get_settings() -> Settings:
         ingest_date=ingest_date,
         batch_month=batch_month,
         batch_id=f"kcia_{batch_month}",
+        batch_job=batch_job,
+        batch_date=now_utc,
         strict_count_check=os.getenv("KCIA_STRICT_COUNT_CHECK", "true").lower() == "true",
         user_agent=os.getenv(
             "KCIA_USER_AGENT",
