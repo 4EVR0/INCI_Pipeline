@@ -7,8 +7,9 @@ from pathlib import Path
 from pipeline.silver_mapping.kcia_cosing.s3_io import upload_file, upload_json
 
 from .config import GoldSettings, get_gold_settings
-from .transform import load_matched_final_csv, transform_matched_final_to_gold
+from .transform import load_csv, transform_to_gold
 from .write_iceberg import write_gold_to_iceberg
+
 
 
 GOLD_CSV_NAME = "kcia_cosing_gold_ingredients.csv"
@@ -24,11 +25,11 @@ def _write_csv(df, path: Path) -> None:
 
 
 def run_gold_pipeline(settings: GoldSettings, upload_s3: bool = True) -> dict[str, object]:
-    if not settings.silver_matched_path.exists():
-        raise FileNotFoundError(f"Silver matched_final 없음: {settings.silver_matched_path}")
+    if not settings.silver_graphrag_path.exists():
+        raise FileNotFoundError(f"Silver graphrag_map 없음: {settings.silver_graphrag_path}")
 
-    raw = load_matched_final_csv(settings.silver_matched_path)
-    gold_df = transform_matched_final_to_gold(raw)
+    graphrag_df = load_csv(settings.silver_graphrag_path)
+    gold_df = transform_to_gold(graphrag_df)
     gold_df["batch_job"] = settings.batch_job
     gold_df["batch_date"] = settings.batch_date.isoformat()
 

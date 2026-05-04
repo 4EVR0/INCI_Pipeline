@@ -5,37 +5,28 @@ from pathlib import Path
 
 import pandas as pd
 
-# matched_final → gold ingredient (gold_schema.txt)
-KEEP_SILVER_COLS = [
-    "canonical_inci_name",
-    "std_name_ko",
-    "std_name_en",
-    "function_names",
-    "status",
-    "cosmetic_restriction",
-    "other_restrictions",
-    "match_score",
-]
-
 GOLD_COLUMN_ORDER = [
     "inci_name",
     "kor_name",
     "eng_name",
+    "ingredient_code",
+    "kcia_cas_no",
     "cosing_functions",
     "status",
     "cosmetic_restriction",
     "other_restrictions",
+    "match_type",
+    "match_score",
+    "is_fuzzy",
 ]
 
 
 def _normalize_cosing_functions(raw: object) -> str:
-    """세미콜론 기준 분리 + strip + 빈값 제거 + 중복 제거; CSV에는 ; 로 join (스키마 권장)."""
     if raw is None or (isinstance(raw, float) and pd.isna(raw)):
         return ""
     s = str(raw).strip()
     if not s:
         return ""
-    # 원본에 | 구분이 많아 ; 와 | 를 동일한 구분자로 취급한 뒤 ; 로 재조합
     parts = re.split(r"[;|]", s)
     seen: set[str] = set()
     ordered: list[str] = []
@@ -51,63 +42,59 @@ def _normalize_cosing_functions(raw: object) -> str:
     return ";".join(ordered)
 
 
-def transform_matched_final_to_gold(df: pd.DataFrame) -> pd.DataFrame:
-    missing = [c for c in KEEP_SILVER_COLS if c not in df.columns]
-    if missing:
-        raise ValueError(f"matched_final에 필요한 컬럼이 없습니다: {missing}")
+def _clean_str(series: pd.Series) -> pd.Series:
+    return series.astype(str).replace({"nan": "", "None": ""}).str.strip().replace({"": pd.NA})
 
-    work = df[KEEP_SILVER_COLS].copy()
 
-    inci = work["canonical_inci_name"].astype(str)
-    mask = work["canonical_inci_name"].notna() & (inci.str.strip() != "") & (inci != "nan")
-    work = work.loc[mask].copy()
+def transform_to_gold(graphrag_df: pd.DataFrame) -> pd.DataFrame:
+    """
+    graphrag_map → Gold ingredients
 
-    work["match_score"] = pd.to_numeric(work["match_score"], errors="coerce")
-
-    work["_has_fn"] = work["function_names"].notna() & (
-        work["function_names"].astype(str).str.strip().ne("") & work["function_names"].astype(str).ne("nan")
-    )
-    work["_has_ko"] = work["std_name_ko"].notna() & (
-        work["std_name_ko"].astype(str).str.strip().ne("") & work["std_name_ko"].astype(str).ne("nan")
-    )
-    work["_has_en"] = work["std_name_en"].notna() & (
-        work["std_name_en"].astype(str).str.strip().ne("") & work["std_name_en"].astype(str).ne("nan")
+    graphrag_map은 전체 KCIA 성분을 포함합니다:
+      - exact_*  : 정확 매칭
+      - fuzzy_*  : 퍼지 매칭 (is_fuzzy=True)
+      - kcia_only: INCI 매핑 없는 성분 (inci_name=None)
+    """
+    g = graphrag_df.copy()
+    g["match_score"] = pd.to_numeric(g.get("match_score"), errors="coerce")
+    g["is_fuzzy"] = g.get("is_fuzzy", False).apply(
+        lambda v: bool(v) if isinstance(v, bool)
+        else (str(v).strip().upper() == "TRUE" if pd.notna(v) else False)
     )
 
-    work = work.sort_values(
-        by=["match_score", "_has_fn", "_has_ko", "_has_en"],
-        ascending=[False, False, False, False],
-        kind="mergesort",
-    )
-    work = work.drop_duplicates(subset=["canonical_inci_name"], keep="first")
+    # 동일 ingredient_code 중 match_score 높은 것 유지
+    g = g.sort_values("match_score", ascending=False, na_position="last", kind="mergesort")
+    g = g.drop_duplicates(subset=["ingredient_code"], keep="first")
 
-    out = pd.DataFrame(
-        {
-            "inci_name": work["canonical_inci_name"].astype(str).str.strip(),
-            "kor_name": work["std_name_ko"].astype(str).replace({"nan": ""}).str.strip(),
-            "eng_name": work["std_name_en"].astype(str).replace({"nan": ""}).str.strip(),
-            "cosing_functions": work["function_names"].map(_normalize_cosing_functions),
-            "status": work["status"].astype(str).replace({"nan": ""}).str.strip(),
-            "cosmetic_restriction": work["cosmetic_restriction"]
-            .astype(str)
-            .replace({"nan": ""})
-            .str.strip(),
-            "other_restrictions": work["other_restrictions"].astype(str).replace({"nan": ""}).str.strip(),
-        }
-    )
+    inci = _clean_str(g.get("canonical_inci_name", pd.Series(dtype=str)))
+    # kcia_only는 canonical_inci_name이 비어 있음 → NA 유지
 
-    for col in (
-        "kor_name",
-        "eng_name",
-        "cosing_functions",
-        "status",
-        "cosmetic_restriction",
-        "other_restrictions",
-    ):
-        out[col] = out[col].replace("", pd.NA)
+    out = pd.DataFrame({
+        "inci_name":            inci,
+        "kor_name":             _clean_str(g.get("std_name_ko", pd.Series(dtype=str))),
+        "eng_name":             _clean_str(g.get("std_name_en", pd.Series(dtype=str))),
+        "ingredient_code":      _clean_str(g.get("ingredient_code", pd.Series(dtype=str))),
+        "kcia_cas_no":          _clean_str(g.get("kcia_cas_no", pd.Series(dtype=str))),
+        "cosing_functions":     g.get("function_names", pd.Series(dtype=str)).map(_normalize_cosing_functions).replace({"": pd.NA}),
+        "status":               _clean_str(g.get("status", pd.Series(dtype=str))),
+        "cosmetic_restriction": _clean_str(g.get("cosmetic_restriction", pd.Series(dtype=str))),
+        "other_restrictions":   _clean_str(g.get("other_restrictions", pd.Series(dtype=str))),
+        "match_type":           _clean_str(g.get("match_type", pd.Series(dtype=str))),
+        "match_score":          g["match_score"],
+        "is_fuzzy":             g["is_fuzzy"],
+    })
 
     return out[GOLD_COLUMN_ORDER].reset_index(drop=True)
 
 
-def load_matched_final_csv(path: str | Path) -> pd.DataFrame:
+def load_csv(path: str | Path) -> pd.DataFrame:
     return pd.read_csv(path, dtype=str).fillna("")
+
+
+# 하위 호환용 alias
+def load_matched_final_csv(path: str | Path) -> pd.DataFrame:
+    return load_csv(path)
+
+
+def transform_matched_final_to_gold(df: pd.DataFrame) -> pd.DataFrame:
+    return transform_to_gold(df)

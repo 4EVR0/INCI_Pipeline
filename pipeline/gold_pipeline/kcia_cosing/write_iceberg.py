@@ -17,7 +17,7 @@ import pyarrow as pa
 from pyiceberg.exceptions import NoSuchTableError
 from pyiceberg.partitioning import PartitionSpec
 from pyiceberg.schema import Schema
-from pyiceberg.types import NestedField, StringType, TimestamptzType
+from pyiceberg.types import BooleanType, FloatType, NestedField, StringType, TimestamptzType
 
 from common.iceberg_config import INCIIceberg
 
@@ -27,15 +27,20 @@ from common.iceberg_config import INCIIceberg
 # ==========================================
 
 GOLD_INGREDIENTS_SCHEMA = Schema(
-    NestedField(1, "inci_name",            StringType(),      required=True),
-    NestedField(2, "kor_name",             StringType(),      required=False),
-    NestedField(3, "eng_name",             StringType(),      required=False),
-    NestedField(4, "cosing_functions",     StringType(),      required=False),
-    NestedField(5, "status",               StringType(),      required=False),
-    NestedField(6, "cosmetic_restriction", StringType(),      required=False),
-    NestedField(7, "other_restrictions",   StringType(),      required=False),
-    NestedField(8, "batch_job",            StringType(),      required=False),
-    NestedField(9, "batch_date",           TimestamptzType(), required=False),
+    NestedField(1,  "inci_name",            StringType(),      required=False),
+    NestedField(2,  "kor_name",             StringType(),      required=False),
+    NestedField(3,  "eng_name",             StringType(),      required=False),
+    NestedField(4,  "ingredient_code",      StringType(),      required=False),
+    NestedField(5,  "kcia_cas_no",          StringType(),      required=False),
+    NestedField(6,  "cosing_functions",     StringType(),      required=False),
+    NestedField(7,  "status",               StringType(),      required=False),
+    NestedField(8,  "cosmetic_restriction", StringType(),      required=False),
+    NestedField(9,  "other_restrictions",   StringType(),      required=False),
+    NestedField(10, "match_type",           StringType(),      required=False),
+    NestedField(11, "match_score",          FloatType(),       required=False),
+    NestedField(12, "is_fuzzy",             BooleanType(),     required=False),
+    NestedField(13, "batch_job",            StringType(),      required=False),
+    NestedField(14, "batch_date",           TimestamptzType(), required=False),
 )
 
 
@@ -65,6 +70,12 @@ def _build_arrow_table(df: pd.DataFrame, table) -> pa.Table:
 
     if "batch_date" in work_df.columns:
         work_df["batch_date"] = pd.to_datetime(work_df["batch_date"], utc=True, errors="coerce")
+    if "match_score" in work_df.columns:
+        work_df["match_score"] = pd.to_numeric(work_df["match_score"], errors="coerce")
+    if "is_fuzzy" in work_df.columns:
+        work_df["is_fuzzy"] = work_df["is_fuzzy"].apply(
+            lambda v: bool(v) if isinstance(v, bool) else (str(v).lower() == "true" if pd.notna(v) else None)
+        )
 
     # pd.NA → None 변환 (pyarrow 직렬화 호환)
     work_df = work_df.where(work_df.notna(), other=None)

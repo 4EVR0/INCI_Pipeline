@@ -12,12 +12,14 @@ load_dotenv()
 
 _BATCH_JOB_RE = re.compile(r"^batch_job=(\d{8}_\d{6})$")
 MATCHED_FINAL_NAME = "kcia_cosing_matched_final.csv"
+GRAPHRAG_MAP_NAME  = "kcia_cosing_graphrag_map.csv"
 
 
 @dataclass(frozen=True)
 class GoldSettings:
     base_dir: Path
     silver_matched_path: Path
+    silver_graphrag_path: Path
     gold_output_dir: Path
     batch_month: str
     batch_job: str
@@ -26,8 +28,7 @@ class GoldSettings:
     s3_gold_prefix: str
 
 
-def discover_latest_silver_matched_final(base_dir: Path) -> tuple[str, Path]:
-    """silver/kcia_cosing/batch_job=YYYYMMDD_HHMMSS/kcia_cosing_matched_final.csv 중 가장 최근 배치."""
+def _discover_latest_silver_file(base_dir: Path, filename: str) -> tuple[str, Path]:
     silver_root = base_dir / "data" / "silver" / "kcia_cosing"
     if not silver_root.is_dir():
         raise FileNotFoundError(f"실버 루트가 없습니다: {silver_root}")
@@ -39,24 +40,25 @@ def discover_latest_silver_matched_final(base_dir: Path) -> tuple[str, Path]:
         m = _BATCH_JOB_RE.match(child.name)
         if not m:
             continue
-        csv_path = child / MATCHED_FINAL_NAME
+        csv_path = child / filename
         if csv_path.is_file():
             candidates.append((m.group(1), csv_path))
 
     if not candidates:
         raise FileNotFoundError(
-            f"matched_final CSV가 있는 batch_job= 폴더를 찾지 못했습니다: {silver_root}"
+            f"{filename}이 있는 batch_job= 폴더를 찾지 못했습니다: {silver_root}"
         )
 
-    candidates.sort(reverse=True)  # 문자열 정렬 → 최신 배치
-    batch_job, csv_path = candidates[0]
-    return batch_job, csv_path
+    candidates.sort(reverse=True)
+    return candidates[0]
 
 
 def get_gold_settings() -> GoldSettings:
     base_dir = Path(__file__).resolve().parent.parent.parent.parent
 
-    _, silver_path = discover_latest_silver_matched_final(base_dir)
+    _, silver_matched  = _discover_latest_silver_file(base_dir, MATCHED_FINAL_NAME)
+    _, silver_graphrag = _discover_latest_silver_file(base_dir, GRAPHRAG_MAP_NAME)
+    silver_path = silver_matched
 
     gold_output_dir = base_dir / "data" / "gold"
     gold_output_dir.mkdir(parents=True, exist_ok=True)
@@ -68,6 +70,7 @@ def get_gold_settings() -> GoldSettings:
     return GoldSettings(
         base_dir=base_dir,
         silver_matched_path=silver_path,
+        silver_graphrag_path=silver_graphrag,
         gold_output_dir=gold_output_dir,
         batch_month=batch_month,
         batch_job=batch_job,
