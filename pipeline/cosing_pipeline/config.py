@@ -6,6 +6,8 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
+from cosme_common.batch import build_batch_id
+
 load_dotenv()
 
 
@@ -80,7 +82,7 @@ def get_settings() -> Settings:
         raise ValueError("S3_BUCKET is not set")
 
     now_utc = datetime.now(timezone.utc)
-    batch_job = now_utc.strftime("%Y%m%d_%H%M%S")
+    batch_job = build_batch_id()
 
     output_dir = project_root / "data" / "bronze" / "cosing" / f"batch_job={batch_job}"
     log_dir = project_root / "logs"

@@ -8,6 +8,8 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
+from cosme_common.batch import build_batch_id
+
 load_dotenv()
 
 _BATCH_JOB_RE = re.compile(r"^batch_job=(\d{8}_\d{6})$")
@@ -64,7 +66,7 @@ def get_gold_settings() -> GoldSettings:
     gold_output_dir.mkdir(parents=True, exist_ok=True)
 
     now_utc = datetime.now(timezone.utc)
-    batch_job = now_utc.strftime("%Y%m%d_%H%M%S")
+    batch_job = build_batch_id()
     batch_month = now_utc.strftime("%Y-%m")
 
     return GoldSettings(

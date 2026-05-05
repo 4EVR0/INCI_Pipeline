@@ -5,6 +5,8 @@ from datetime import datetime, timezone
 
 from dotenv import load_dotenv
 
+from cosme_common.batch import build_batch_id
+
 load_dotenv()
 
 
@@ -69,7 +71,7 @@ def get_settings() -> Settings:
         raise ValueError("S3_BUCKET is not set")
 
     now_utc = datetime.now(timezone.utc)
-    batch_job = now_utc.strftime("%Y%m%d_%H%M%S")
+    batch_job = build_batch_id()
 
     return Settings(
         kcia_base_url=kcia_base_url,
