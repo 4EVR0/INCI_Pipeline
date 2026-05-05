@@ -7,6 +7,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 from cosme_common.batch import build_batch_id
+from cosme_common.s3_paths import INCI_BRONZE_COSING_PREFIX
 
 load_dotenv()
 
@@ -114,7 +115,7 @@ def get_settings() -> Settings:
         batch_job=batch_job,
         batch_date=now_utc,
         s3_bucket=s3_bucket,
-        s3_prefix=os.getenv("COSING_S3_PREFIX", "INCI_data/cosing"),
+        s3_prefix=os.getenv("COSING_S3_PREFIX", INCI_BRONZE_COSING_PREFIX),
         strict_validation=os.getenv("COSING_STRICT_VALIDATION", "true").lower() == "true",
         resume_enabled=os.getenv("COSING_RESUME_ENABLED", "true").lower() == "true",
         clear_checkpoint_on_success=os.getenv(
