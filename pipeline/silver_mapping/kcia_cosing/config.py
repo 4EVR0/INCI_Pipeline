@@ -9,6 +9,9 @@ from typing import Optional
 
 from dotenv import load_dotenv
 
+from cosme_common.batch import build_batch_id
+from cosme_common.s3_paths import BUCKET, INCI_BRONZE_KCIA_PREFIX, INCI_BRONZE_COSING_PREFIX
+
 load_dotenv()
 
 
@@ -96,7 +99,7 @@ def get_settings() -> Settings:
         )
 
     now_utc = datetime.now(timezone.utc)
-    batch_job = now_utc.strftime("%Y%m%d_%H%M%S")
+    batch_job = build_batch_id()
 
     return Settings(
         base_dir=base_dir,
@@ -108,9 +111,9 @@ def get_settings() -> Settings:
         input_mode=os.getenv("MAPPING_INPUT_MODE", "bronze_local").strip().lower(),
         kcia_local_path=Path(_kcia_env) if (_kcia_env := os.getenv("KCIA_LOCAL_PATH")) else kcia_local_default,
         cosing_local_path=Path(_cosing_env) if (_cosing_env := os.getenv("COSING_LOCAL_PATH")) else cosing_local_default,
-        s3_bucket=os.getenv("S3_BUCKET", "oliveyoung-crawl-data"),
-        kcia_s3_prefix=os.getenv("KCIA_S3_PREFIX", "INCI_data/kcia"),
-        cosing_s3_prefix=os.getenv("COSING_S3_PREFIX", "INCI_data/cosing"),
+        s3_bucket=os.getenv("S3_BUCKET", BUCKET),
+        kcia_s3_prefix=os.getenv("KCIA_S3_PREFIX", INCI_BRONZE_KCIA_PREFIX),
+        cosing_s3_prefix=os.getenv("COSING_S3_PREFIX", INCI_BRONZE_COSING_PREFIX),
         aws_region=os.getenv("AWS_DEFAULT_REGION", "ap-northeast-2"),
         fuzzy_auto_threshold=fuzzy_auto,
         fuzzy_review_threshold=fuzzy_review,

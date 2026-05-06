@@ -5,6 +5,9 @@ from datetime import datetime, timezone
 
 from dotenv import load_dotenv
 
+from cosme_common.batch import build_batch_id
+from cosme_common.s3_paths import INCI_BRONZE_KCIA_PREFIX
+
 load_dotenv()
 
 
@@ -69,12 +72,12 @@ def get_settings() -> Settings:
         raise ValueError("S3_BUCKET is not set")
 
     now_utc = datetime.now(timezone.utc)
-    batch_job = now_utc.strftime("%Y%m%d_%H%M%S")
+    batch_job = build_batch_id()
 
     return Settings(
         kcia_base_url=kcia_base_url,
         s3_bucket=s3_bucket,
-        s3_prefix=os.getenv("KCIA_S3_PREFIX", "INCI_data/kcia"),
+        s3_prefix=os.getenv("KCIA_S3_PREFIX", INCI_BRONZE_KCIA_PREFIX),
         request_sleep=float(os.getenv("KCIA_REQUEST_SLEEP", "0.35")),
         timeout=int(os.getenv("KCIA_TIMEOUT", "15")),
         max_retries=int(os.getenv("KCIA_MAX_RETRIES", "5")),
