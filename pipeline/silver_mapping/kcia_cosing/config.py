@@ -9,8 +9,8 @@ from typing import Optional
 
 from dotenv import load_dotenv
 
-from cosme_common.batch import build_batch_id
-from cosme_common.s3_paths import BUCKET, INCI_BRONZE_KCIA_PREFIX, INCI_BRONZE_COSING_PREFIX
+from oliveyoung_common.batch import build_batch_id
+from oliveyoung_common.s3_paths import BUCKET, INCI_BRONZE_KCIA_PREFIX, INCI_BRONZE_COSING_PREFIX
 
 load_dotenv()
 

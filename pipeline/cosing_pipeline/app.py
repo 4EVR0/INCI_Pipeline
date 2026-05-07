@@ -6,7 +6,7 @@ from pipeline.cosing_pipeline.transform.transform import transform_to_bronze
 from pipeline.cosing_pipeline.validate import validate_bronze
 from pipeline.cosing_pipeline.write_iceberg import write_cosing_bronze_to_iceberg
 from pipeline.cosing_pipeline.utils.logging_utils import setup_logger
-from cosme_common.logging import job_unit
+from oliveyoung_common.logging import job_unit
 
 logger = setup_logger()
 
