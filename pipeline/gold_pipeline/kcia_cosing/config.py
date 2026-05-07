@@ -8,12 +8,12 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-from oliveyoung_common.batch import build_batch_id
+from oliveyoung_common.batch import create_batch_metadata
 from oliveyoung_common.s3_paths import INCI_GOLD_PREFIX
 
 load_dotenv()
 
-_BATCH_JOB_RE = re.compile(r"^batch_job=(\d{8}_\d{6})$")
+_RUN_ID_RE = re.compile(r"^run_id=([a-z_]+_\d{8}_\d{6})$")
 MATCHED_FINAL_NAME = "kcia_cosing_matched_final.csv"
 GRAPHRAG_MAP_NAME  = "kcia_cosing_graphrag_map.csv"
 
@@ -27,6 +27,7 @@ class GoldSettings:
     batch_month: str
     batch_job: str
     batch_date: datetime
+    run_id: str
     s3_bucket: str
     s3_gold_prefix: str
 
@@ -40,7 +41,7 @@ def _discover_latest_silver_file(base_dir: Path, filename: str) -> tuple[str, Pa
     for child in silver_root.iterdir():
         if not child.is_dir():
             continue
-        m = _BATCH_JOB_RE.match(child.name)
+        m = _RUN_ID_RE.match(child.name)
         if not m:
             continue
         csv_path = child / filename
@@ -66,9 +67,8 @@ def get_gold_settings() -> GoldSettings:
     gold_output_dir = base_dir / "data" / "gold"
     gold_output_dir.mkdir(parents=True, exist_ok=True)
 
-    now_utc = datetime.now(timezone.utc)
-    batch_job = build_batch_id()
-    batch_month = now_utc.strftime("%Y-%m")
+    batch = create_batch_metadata("inci_gold")
+    batch_month = batch.batch_date.strftime("%Y-%m")
 
     return GoldSettings(
         base_dir=base_dir,
@@ -76,8 +76,9 @@ def get_gold_settings() -> GoldSettings:
         silver_graphrag_path=silver_graphrag,
         gold_output_dir=gold_output_dir,
         batch_month=batch_month,
-        batch_job=batch_job,
-        batch_date=now_utc,
+        batch_job=batch.batch_job,
+        batch_date=batch.batch_date,
+        run_id=batch.run_id,
         s3_bucket=os.getenv("S3_BUCKET", "").strip(),
         s3_gold_prefix=os.getenv("S3_GOLD_PREFIX", INCI_GOLD_PREFIX),
     )

@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 
 from dotenv import load_dotenv
 
-from oliveyoung_common.batch import build_batch_id
+from oliveyoung_common.batch import create_batch_metadata
 from oliveyoung_common.s3_paths import INCI_BRONZE_KCIA_PREFIX
 
 load_dotenv()
@@ -26,6 +26,7 @@ class Settings:
     batch_id: str
     batch_job: str
     batch_date: datetime
+    run_id: str
 
     strict_count_check: bool
     user_agent: str
@@ -71,8 +72,7 @@ def get_settings() -> Settings:
     if not s3_bucket:
         raise ValueError("S3_BUCKET is not set")
 
-    now_utc = datetime.now(timezone.utc)
-    batch_job = build_batch_id()
+    batch = create_batch_metadata("kcia_pipeline")
 
     return Settings(
         kcia_base_url=kcia_base_url,
@@ -84,8 +84,9 @@ def get_settings() -> Settings:
         ingest_date=ingest_date,
         batch_month=batch_month,
         batch_id=f"kcia_{batch_month}",
-        batch_job=batch_job,
-        batch_date=now_utc,
+        batch_job=batch.batch_job,
+        batch_date=batch.batch_date,
+        run_id=batch.run_id,
         strict_count_check=os.getenv("KCIA_STRICT_COUNT_CHECK", "true").lower() == "true",
         user_agent=os.getenv(
             "KCIA_USER_AGENT",

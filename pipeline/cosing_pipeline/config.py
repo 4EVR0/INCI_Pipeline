@@ -6,7 +6,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-from oliveyoung_common.batch import build_batch_id
+from oliveyoung_common.batch import create_batch_metadata
 from oliveyoung_common.s3_paths import INCI_BRONZE_COSING_PREFIX
 
 load_dotenv()
@@ -34,6 +34,7 @@ class Settings:
     batch_id: str
     batch_job: str
     batch_date: datetime
+    run_id: str
 
     s3_bucket: str
     s3_prefix: str
@@ -82,10 +83,9 @@ def get_settings() -> Settings:
     if not s3_bucket:
         raise ValueError("S3_BUCKET is not set")
 
-    now_utc = datetime.now(timezone.utc)
-    batch_job = build_batch_id()
+    batch = create_batch_metadata("cosing_pipeline")
 
-    output_dir = project_root / "data" / "bronze" / "cosing" / f"batch_job={batch_job}"
+    output_dir = project_root / "data" / "bronze" / "cosing" / f"run_id={batch.run_id}"
     log_dir = project_root / "logs"
 
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -112,8 +112,9 @@ def get_settings() -> Settings:
         ingest_date=ingest_date,
         batch_month=batch_month,
         batch_id=f"cosing_{batch_month}",
-        batch_job=batch_job,
-        batch_date=now_utc,
+        batch_job=batch.batch_job,
+        batch_date=batch.batch_date,
+        run_id=batch.run_id,
         s3_bucket=s3_bucket,
         s3_prefix=os.getenv("COSING_S3_PREFIX", INCI_BRONZE_COSING_PREFIX),
         strict_validation=os.getenv("COSING_STRICT_VALIDATION", "true").lower() == "true",

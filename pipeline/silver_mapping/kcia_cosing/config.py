@@ -9,7 +9,7 @@ from typing import Optional
 
 from dotenv import load_dotenv
 
-from oliveyoung_common.batch import build_batch_id
+from oliveyoung_common.batch import create_batch_metadata
 from oliveyoung_common.s3_paths import BUCKET, INCI_BRONZE_KCIA_PREFIX, INCI_BRONZE_COSING_PREFIX
 
 load_dotenv()
@@ -24,6 +24,7 @@ class Settings:
     batch_month: str
     batch_job: str
     batch_date: datetime
+    run_id: str
     input_mode: str  # bronze_local | s3
 
     kcia_local_path: Optional[Path]
@@ -55,7 +56,7 @@ def _derive_batch_month() -> str:
     return datetime.now().strftime("%Y-%m")
 
 
-_BATCH_JOB_RE = re.compile(r"^batch_job=(\d{8}_\d{6})$")
+_RUN_ID_RE = re.compile(r"^run_id=([a-z_]+_\d{8}_\d{6})$")
 
 
 def _discover_latest_bronze_path(base_dir: Path, source: str, filename: str) -> Optional[Path]:
@@ -67,7 +68,7 @@ def _discover_latest_bronze_path(base_dir: Path, source: str, filename: str) -> 
     for child in bronze_root.iterdir():
         if not child.is_dir():
             continue
-        m = _BATCH_JOB_RE.match(child.name)
+        m = _RUN_ID_RE.match(child.name)
         if not m:
             continue
         csv_path = child / filename
@@ -98,16 +99,16 @@ def get_settings() -> Settings:
             f"FUZZY_REVIEW_THRESHOLD({fuzzy_review})는 FUZZY_AUTO_THRESHOLD({fuzzy_auto})보다 작아야 합니다."
         )
 
-    now_utc = datetime.now(timezone.utc)
-    batch_job = build_batch_id()
+    batch = create_batch_metadata("silver_mapping")
 
     return Settings(
         base_dir=base_dir,
         output_dir=output_dir,
         review_dir=review_dir,
         batch_month=batch_month,
-        batch_job=batch_job,
-        batch_date=now_utc,
+        batch_job=batch.batch_job,
+        batch_date=batch.batch_date,
+        run_id=batch.run_id,
         input_mode=os.getenv("MAPPING_INPUT_MODE", "bronze_local").strip().lower(),
         kcia_local_path=Path(_kcia_env) if (_kcia_env := os.getenv("KCIA_LOCAL_PATH")) else kcia_local_default,
         cosing_local_path=Path(_cosing_env) if (_cosing_env := os.getenv("COSING_LOCAL_PATH")) else cosing_local_default,
