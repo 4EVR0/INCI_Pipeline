@@ -11,6 +11,9 @@ from pipeline.kcia_pipeline.validate import validate
 from pipeline.kcia_pipeline.write_iceberg import write_kcia_bronze_to_iceberg
 from pipeline.kcia_pipeline.utils.logging_utils import setup_logger
 from oliveyoung_common.logging import job_unit
+from oliveyoung_common.logging import setup_logging
+
+setup_logging("inci-kcia")
 
 logger = setup_logger()
 
