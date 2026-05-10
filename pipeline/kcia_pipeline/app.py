@@ -10,6 +10,10 @@ from pipeline.kcia_pipeline.transform import transform_to_bronze
 from pipeline.kcia_pipeline.validate import validate
 from pipeline.kcia_pipeline.write_iceberg import write_kcia_bronze_to_iceberg
 from pipeline.kcia_pipeline.utils.logging_utils import setup_logger
+from oliveyoung_common.logging import job_unit
+from oliveyoung_common.logging import setup_logging
+
+setup_logging("inci-kcia")
 
 logger = setup_logger()
 
@@ -34,8 +38,8 @@ def _clear_checkpoint_files(paths) -> None:
         paths.checkpoint_rows_path.unlink()
 
 
-def main():
-    settings = get_settings()
+def _main_impl(settings=None):
+    settings = settings or get_settings()
     paths = get_kcia_bronze_paths(
         batch_month=settings.batch_month,
         batch_job=settings.batch_job,
@@ -98,6 +102,18 @@ def main():
         logger.info("Checkpoint files removed after successful completion")
 
     logger.info("Pipeline completed successfully")
+
+
+def main():
+    settings = get_settings()
+    with job_unit(
+        logger,
+        job="kcia_bronze",
+        run_id=settings.batch_id,
+        batch_job=settings.batch_job,
+        batch_month=settings.batch_month,
+    ):
+        _main_impl(settings=settings)
 
 
 if __name__ == "__main__":
