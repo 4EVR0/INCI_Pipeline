@@ -8,6 +8,7 @@ venv/
 .env
 
 .omc/
+.claude/
 # logs
 logs/
 *.log

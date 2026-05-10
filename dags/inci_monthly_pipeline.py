@@ -16,12 +16,16 @@ from pathlib import Path
 
 from airflow import DAG
 from airflow.models import Variable
+from airflow.operators.bash import BashOperator
 from airflow.providers.docker.operators.docker import DockerOperator
 from docker.types import Mount
 
 # ---------------------------------------------------------------------------
 # 설정
 # ---------------------------------------------------------------------------
+
+ECR_REGISTRY = os.environ.get("ECR_REGISTRY", "")
+IMAGE = f"{ECR_REGISTRY}/evr0/inci-pipeline:latest"
 
 # 우선순위: Airflow Variable > 환경변수 HOST_PROJECT_DIR > 기본값
 # EC2 배포 시 HOST_PROJECT_DIR 또는 Airflow Variable 'inci_project_dir' 을 실제 경로로 설정
@@ -51,7 +55,7 @@ ENV_VARS = _load_env(os.path.join(PROJECT_DIR, ".env"))
 # ---------------------------------------------------------------------------
 
 COMMON = dict(
-    image="inci-data-pipeline:latest",
+    image=IMAGE,
     docker_url="unix://var/run/docker.sock",
     network_mode="bridge",
     auto_remove="success",
@@ -87,6 +91,14 @@ with DAG(
     tags=["inci", "bronze", "silver", "gold"],
 ) as dag:
 
+    ecr_login = BashOperator(
+        task_id="ecr_login",
+        bash_command=(
+            "aws ecr get-login-password --region ap-northeast-2 "
+            "| docker login --username AWS --password-stdin $ECR_REGISTRY"
+        ),
+    )
+
     bronze_kcia = DockerOperator(
         task_id="bronze_kcia",
         command="python -m pipeline.kcia_pipeline.app",
@@ -116,4 +128,4 @@ with DAG(
     )
 
     # bronze 둘 다 완료돼야 silver 시작
-    [bronze_kcia, bronze_cosing] >> silver_mapping >> gold_pipeline
+    ecr_login >> [bronze_kcia, bronze_cosing] >> silver_mapping >> gold_pipeline
