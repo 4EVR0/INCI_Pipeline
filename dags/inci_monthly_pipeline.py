@@ -59,6 +59,7 @@ COMMON = dict(
     network_mode="bridge",
     auto_remove="success",
     mount_tmp_dir=False,
+    force_pull=True,
     mounts=[
         Mount(source=PROJECT_DIR, target="/app", type="bind"),
     ],
