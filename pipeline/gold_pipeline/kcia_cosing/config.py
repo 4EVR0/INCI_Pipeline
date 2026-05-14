@@ -50,10 +50,10 @@ def _discover_latest_silver_file(base_dir: Path, filename: str) -> tuple[str, Pa
 
     if not candidates:
         raise FileNotFoundError(
-            f"{filename}이 있는 batch_job= 폴더를 찾지 못했습니다: {silver_root}"
+            f"{filename}이 있는 run_id= 폴더를 찾지 못했습니다: {silver_root}"
         )
 
-    candidates.sort(reverse=True)
+    candidates.sort(reverse=True)  # run_id 문자열에 타임스탬프 포함 → 최신 순
     return candidates[0]
 
 

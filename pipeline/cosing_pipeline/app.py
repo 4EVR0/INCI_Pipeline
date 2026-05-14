@@ -94,9 +94,9 @@ def _main_impl(settings=None):
     logger.info("Saved locally: %s", local_csv)
     logger.info("Saved locally: %s", local_parquet)
 
-    s3_csv_key = f"{settings.s3_prefix}/batch_job={settings.batch_job}/cosing_bronze.csv"
-    s3_parquet_key = f"{settings.s3_prefix}/batch_job={settings.batch_job}/cosing_bronze.parquet"
-    s3_metadata_key = f"{settings.s3_prefix}/batch_job={settings.batch_job}/metadata.json"
+    s3_csv_key = f"{settings.s3_prefix}/run_id={settings.run_id}/cosing_bronze.csv"
+    s3_parquet_key = f"{settings.s3_prefix}/run_id={settings.run_id}/cosing_bronze.parquet"
+    s3_metadata_key = f"{settings.s3_prefix}/run_id={settings.run_id}/metadata.json"
 
     metadata = build_cosing_bronze_metadata(
         batch_month=settings.batch_month,

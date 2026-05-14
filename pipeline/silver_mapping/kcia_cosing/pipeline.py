@@ -319,7 +319,7 @@ class KCIACosIngSilverMapper:
 
 def _build_s3_prefix(settings: Settings) -> str:
     base_prefix = os.getenv("S3_SILVER_PREFIX", "silver").rstrip("/")
-    return f"{base_prefix}/kcia_cosing/batch_job={settings.batch_job}"
+    return f"{base_prefix}/kcia_cosing/run_id={settings.run_id}"
 
 
 def _upload_outputs_to_s3(output_paths: dict[str, Path], settings: Settings) -> dict[str, str]:
@@ -392,7 +392,7 @@ def run_and_save(settings: Settings) -> dict[str, object]:
     results = mapper.run()
     results = _inject_batch_columns(results, settings)
 
-    batch_dir = settings.output_dir / f"batch_job={settings.batch_job}"
+    batch_dir = settings.output_dir / f"run_id={settings.run_id}"
     batch_dir.mkdir(parents=True, exist_ok=True)
 
     local_output_paths: dict[str, Path] = {

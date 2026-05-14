@@ -43,6 +43,7 @@ def _main_impl(settings=None):
     paths = get_kcia_bronze_paths(
         batch_month=settings.batch_month,
         batch_job=settings.batch_job,
+        run_id=settings.run_id,
         s3_prefix=settings.s3_prefix,
     )
 

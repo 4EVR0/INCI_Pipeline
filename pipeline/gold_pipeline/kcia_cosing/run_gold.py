@@ -16,7 +16,7 @@ GOLD_CSV_NAME = "kcia_cosing_gold_ingredients.csv"
 
 
 def _gold_s3_prefix(settings: GoldSettings) -> str:
-    return f"{settings.s3_gold_prefix}/kcia_cosing/batch_job={settings.batch_job}"
+    return f"{settings.s3_gold_prefix}/kcia_cosing/run_id={settings.run_id}"
 
 
 def _write_csv(df, path: Path) -> None:
@@ -33,7 +33,7 @@ def run_gold_pipeline(settings: GoldSettings, upload_s3: bool = True) -> dict[st
     gold_df["batch_job"] = settings.batch_job
     gold_df["batch_date"] = settings.batch_date.isoformat()
 
-    batch_dir = settings.gold_output_dir / f"batch_job={settings.batch_job}"
+    batch_dir = settings.gold_output_dir / f"run_id={settings.run_id}"
     local_csv = batch_dir / GOLD_CSV_NAME
     _write_csv(gold_df, local_csv)
 

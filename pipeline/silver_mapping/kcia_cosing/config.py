@@ -60,7 +60,7 @@ _RUN_ID_RE = re.compile(r"^run_id=([a-z_]+_\d{8}_\d{6})$")
 
 
 def _discover_latest_bronze_path(base_dir: Path, source: str, filename: str) -> Optional[Path]:
-    """data/bronze/{source}/batch_job=YYYYMMDD_HHMMSS/ 중 최신 폴더의 파일 경로를 반환합니다."""
+    """data/bronze/{source}/run_id={pipeline}_{YYYYMMDD_HHMMSS}/ 중 최신 CSV 경로를 반환합니다."""
     bronze_root = base_dir / "data" / "bronze" / source
     if not bronze_root.is_dir():
         return None
@@ -76,7 +76,7 @@ def _discover_latest_bronze_path(base_dir: Path, source: str, filename: str) -> 
             candidates.append((m.group(1), csv_path))
     if not candidates:
         return None
-    candidates.sort(reverse=True)  # 문자열 정렬 → 최신 배치
+    candidates.sort(reverse=True)  # run_id 문자열에 타임스탬프 포함 → 최신 순
     return candidates[0][1]
 
 
