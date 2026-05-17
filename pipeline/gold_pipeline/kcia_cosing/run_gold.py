@@ -1,14 +1,20 @@
 from __future__ import annotations
 
+import logging
 import json
 from datetime import datetime, timezone
 from pathlib import Path
 
+from oliveyoung_common.logging import job_unit, setup_logging
 from pipeline.silver_mapping.kcia_cosing.s3_io import upload_file, upload_json
 
 from .config import GoldSettings, get_gold_settings
 from .transform import load_csv, transform_to_gold
 from .write_iceberg import write_gold_to_iceberg
+
+setup_logging("inci-gold")
+
+logger = logging.getLogger(__name__)
 
 
 
@@ -96,7 +102,15 @@ def main():
     args = p.parse_args()
 
     settings = get_gold_settings()
-    out = run_gold_pipeline(settings, upload_s3=not args.no_upload)
+    with job_unit(
+        logger,
+        job="kcia_cosing_gold_ingredients",
+        run_id=settings.run_id,
+        batch_job=settings.batch_job,
+        batch_month=settings.batch_month,
+        upload_s3=not args.no_upload,
+    ):
+        out = run_gold_pipeline(settings, upload_s3=not args.no_upload)
 
     print("=== KCIA ↔ CosIng Gold (ingredients) ===")
     print(f"batch (latest silver): {settings.batch_month}")
