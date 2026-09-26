@@ -7,12 +7,14 @@ The MFDS ingredient master identifies names and origins; it is not efficacy evid
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import re
 import time
 from datetime import datetime, timezone
 from pathlib import Path
+from urllib.parse import unquote
 
 import pandas as pd
 import requests
@@ -80,10 +82,13 @@ def parse_page(payload: dict, requested_page: int) -> tuple[list[dict], int]:
 def fetch_page(session: requests.Session, service_key: str, page: int, page_size: int) -> tuple[list[dict], int]:
     if not service_key:
         raise ValueError("MFDS_API_KEY is required")
+    # 공공데이터포털은 인코딩/디코딩 키를 모두 표시한다. requests가 쿼리 값을
+    # 인코딩하므로 인코딩 키를 그대로 전달하면 '%'가 이중 인코딩된다.
+    decoded_key = unquote(service_key)
     try:
         response = session.get(
             API_URL,
-            params={"serviceKey": service_key, "pageNo": page,
+            params={"serviceKey": decoded_key, "pageNo": page,
                     "numOfRows": page_size, "type": "json"},
             timeout=20,
         )
@@ -101,8 +106,9 @@ def fetch_page(session: requests.Session, service_key: str, page: int, page_size
 
 def fetch_snapshot(service_key: str, *, page_size: int = 100, max_pages: int = 1,
                    session: requests.Session | None = None) -> tuple[list[dict], dict]:
-    if not 1 <= page_size <= 1000 or max_pages < 1:
-        raise ValueError("page_size must be 1..1000 and max_pages must be positive")
+    # Live API returned resultCode=11 when numOfRows exceeded its maximum of 500.
+    if not 1 <= page_size <= 500 or max_pages < 1:
+        raise ValueError("page_size must be 1..500 and max_pages must be positive")
     rows: list[dict] = []
     total: int | None = None
     own_session = session is None
@@ -126,6 +132,8 @@ def fetch_snapshot(service_key: str, *, page_size: int = 100, max_pages: int = 1
             session.close()
     if total is None or len(rows) > total:
         raise ValueError("MFDS item count is inconsistent")
+    if len({json.dumps(row, ensure_ascii=False, sort_keys=True) for row in rows}) != len(rows):
+        raise ValueError("MFDS snapshot has duplicate rows; pagination may have shifted")
     return rows, {
         "source_url": SOURCE_URL,
         "retrieved_at_utc": datetime.now(timezone.utc).isoformat(),
@@ -151,50 +159,90 @@ def audit_matches(mfds_rows: list[dict], gold: pd.DataFrame) -> dict:
     missing = required - set(gold.columns)
     if missing:
         raise ValueError(f"Gold columns missing: {', '.join(sorted(missing))}")
-    by_name: dict[str, list[dict]] = {}
+    by_english: dict[str, list[dict]] = {}
+    by_korean: dict[str, list[dict]] = {}
     for row in mfds_rows:
-        for key in {_name(row.get("mfds_eng_name")), _name(row.get("mfds_kor_name"))} - {""}:
-            by_name.setdefault(key, []).append(row)
+        english = _name(row.get("mfds_eng_name"))
+        korean = _name(row.get("mfds_kor_name"))
+        if english:
+            by_english.setdefault(english, []).append(row)
+        if korean:
+            by_korean.setdefault(korean, []).append(row)
 
     counts = {status: 0 for status in
-              ("name_and_cas", "name_only", "cas_conflict", "ambiguous", "unmatched")}
+              ("name_and_cas", "cas_disambiguated", "both_names_only",
+               "single_name_only", "name_disagreement", "cas_conflict",
+               "ambiguous", "unmatched")}
     examples: dict[str, list[dict]] = {status: [] for status in counts}
     for _, item in gold.iterrows():
-        names = {_name(item.get(col)) for col in ("inci_name", "eng_name", "kor_name")} - {""}
-        candidates = list({id(row): row for key in names for row in by_name.get(key, [])}.values())
-        gold_cas = _cas(item.get("kcia_cas_no"))
-        if not candidates:
-            status = "unmatched"
-        elif len(candidates) > 1:
-            status = "ambiguous"
+        english_names = {_name(item.get(col)) for col in ("inci_name", "eng_name")} - {""}
+        english = {id(row): row for key in english_names for row in by_english.get(key, [])}
+        korean = {id(row): row for row in by_korean.get(_name(item.get("kor_name")), [])}
+        both = english.keys() & korean.keys()
+        if english and korean and not both:
+            candidates = list((english | korean).values())
+            status = "name_disagreement"
         else:
+            candidates = list((english | korean).values()) if not both else [english[key] for key in both]
+            status = None
+        gold_cas = _cas(item.get("kcia_cas_no"))
+        if status is None and not candidates:
+            status = "unmatched"
+        elif status is None and len(candidates) > 1:
+            cas_matches = [row for row in candidates if gold_cas & _cas(row.get("mfds_cas_no"))]
+            status = "cas_disambiguated" if len(cas_matches) == 1 else "ambiguous"
+        elif status is None:
             source_cas = _cas(candidates[0].get("mfds_cas_no"))
             if gold_cas and source_cas:
                 status = "name_and_cas" if gold_cas & source_cas else "cas_conflict"
             else:
-                status = "name_only"
+                status = "both_names_only" if both else "single_name_only"
         counts[status] += 1
         if len(examples[status]) < 10:
             examples[status].append({
                 "inci_name": _clean(item.get("inci_name")),
                 "kor_name": _clean(item.get("kor_name")),
                 "kcia_cas_no": _clean(item.get("kcia_cas_no")),
+                "mfds_english_matches": len(english),
+                "mfds_korean_matches": len(korean),
                 "mfds_candidates": len(candidates),
             })
-    return {"gold_rows": len(gold), "mfds_rows": len(mfds_rows),
+    return {"audit_version": 2, "gold_rows": len(gold), "mfds_rows": len(mfds_rows),
             "counts": counts, "examples": examples}
+
+
+def load_snapshot(directory: Path) -> tuple[list[dict], dict]:
+    """Re-audit a captured source without making another API call."""
+    data_path = directory / "mfds_ingredients.json"
+    metadata_path = directory / "metadata.json"
+    raw = data_path.read_bytes()
+    rows = json.loads(raw)
+    metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+    if (not isinstance(rows, list) or not isinstance(metadata, dict)
+            or metadata.get("fetched_rows") != len(rows)
+            or (metadata.get("complete") and metadata.get("reported_total") != len(rows))):
+        raise ValueError("MFDS snapshot rows and metadata disagree")
+    if len({json.dumps(row, ensure_ascii=False, sort_keys=True) for row in rows}) != len(rows):
+        raise ValueError("MFDS snapshot has duplicate rows; pagination may have shifted")
+    metadata.pop("matching_audit", None)
+    metadata["source_snapshot_sha256"] = hashlib.sha256(raw).hexdigest()
+    return rows, metadata
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="MFDS 화장품 성분 API 로컬 파일럿 (운영 적재 없음)")
     parser.add_argument("--gold", type=Path, help="기존 Gold CSV; 완전 스냅샷일 때만 커버리지 집계")
+    parser.add_argument("--snapshot-dir", type=Path, help="기존 스냅샷 재감사; API 호출 없음")
     parser.add_argument("--page-size", type=int, default=100)
     parser.add_argument("--max-pages", type=int, default=1)
     parser.add_argument("--out-dir", type=Path, required=True)
     args = parser.parse_args()
-    load_dotenv()
-    rows, metadata = fetch_snapshot(os.getenv("MFDS_API_KEY", ""),
-                                    page_size=args.page_size, max_pages=args.max_pages)
+    if args.snapshot_dir:
+        rows, metadata = load_snapshot(args.snapshot_dir)
+    else:
+        load_dotenv()
+        rows, metadata = fetch_snapshot(os.getenv("MFDS_API_KEY", ""),
+                                        page_size=args.page_size, max_pages=args.max_pages)
     if args.gold and not metadata["complete"]:
         raise ValueError("Gold coverage requires a complete MFDS snapshot; increase --max-pages")
     args.out_dir.mkdir(parents=True, exist_ok=True)
@@ -203,6 +251,8 @@ def main() -> None:
     if args.gold:
         gold = pd.read_csv(args.gold, dtype=str).fillna("")
         metadata["matching_audit"] = audit_matches(rows, gold)
+        metadata["gold_sha256"] = hashlib.sha256(args.gold.read_bytes()).hexdigest()
+        metadata["audited_at_utc"] = datetime.now(timezone.utc).isoformat()
     (args.out_dir / "metadata.json").write_text(
         json.dumps(metadata, ensure_ascii=False, indent=2), encoding="utf-8")
     print(json.dumps({key: metadata[key] for key in ("reported_total", "fetched_rows", "complete")},
