@@ -59,6 +59,29 @@ Raw 데이터를 최소 전처리만 거쳐 저장합니다.
 - Silver matched_final → 분석·서빙용 최종 성분 데이터셋
 - Graph-RAG 검색 시스템 활용
 
+### 식약처 성분 API 파일럿 (선택 실행)
+
+[식약처 화장품 원료성분정보 API](https://www.data.go.kr/data/15111774/openapi.do)는
+표준 한글·영문명, CAS 번호, 기원·정의, 이명을 제공한다. 이는 **성분 식별 자료**이지
+효능·제품 전성분·무향 여부의 근거가 아니다. 파일럿은 월간 DAG 밖에서 실행하며
+Gold, Neo4j, 추천 점수를 바꾸지 않는다.
+
+API 활용신청 후 발급받은 **디코딩 키**를 gitignored `.env`에 `MFDS_API_KEY`로
+설정한다. 키를 커밋하거나 명령행 인자로 넘기지 않는다. 우선 한 페이지와 실제
+JSON 구조를 확인한다:
+
+```bash
+python -m pipeline.mfds_pipeline.pilot \
+  --max-pages 1 --out-dir dev_data/mfds-pilot
+```
+
+기존 Gold CSV와 커버리지를 비교하려면 식약처 **전체** 스냅샷을 수집하고
+`--gold /path/to/kcia_cosing_gold_ingredients.csv`를 지정한다. `metadata.json`의
+`complete`가 `true`가 될 때까지 `--max-pages`를 늘려야 한다. 불완전한
+스냅샷으로는 커버리지를 계산하지 않는다. 감사 결과는 정확한 이름+CAS 일치,
+이름만 일치, CAS 충돌, 중복 후보, 미매칭을 분리한다. 운영 적재 전 이 결과를
+검토해야 한다. 원본 파일은 gitignored `dev_data/`에 둔다.
+
 ---
 
 ## Project Structure
