@@ -77,8 +77,9 @@ Raw 데이터를 최소 전처리만 거쳐 저장합니다.
   남겨 비교하고 다른 성분명으로 확장하지 않는다(포타슘아젤로일다이글리시네이트는 금지 아님).
   `banned`는 INCI명 일치 또는 KCIA명+CAS 일치일 때만 적용한다(Gold의 KCIA명 오매핑 방지).
   CAS·이명 일치는 `kr_regulation_review.csv`로 간다.
-- KCIA Gold에 없는 금지 성분(예: AZELAIC ACID)을 위해 GraphRAG `target_ingredients.csv`도
-  함께 매칭한다(`--targets` 또는 `TARGET_INGREDIENTS_CSV`).
+- KCIA Gold에 없는 성분(예: 국내 금지라 KCIA에 없는 AZELAIC ACID)도 제품 전성분으로 그래프에
+  들어올 수 있어, 규제 행 영문명으로 만든 후보 INCI명을 `source=mfds_name`으로 함께 출력한다.
+  적재 스크립트는 그래프에 실제로 있는 노드와만 조인하므로 외부 목록 설정이 필요 없다.
 
 ```bash
 # .env: REGULATION_API_KEY (data.go.kr 인코딩/디코딩 키 모두 가능)
@@ -261,7 +262,6 @@ S3_GOLD_PREFIX=INCI_data_gold/
 
 # 식약처 규제 필터
 REGULATION_API_KEY=your-data-go-kr-service-key
-TARGET_INGREDIENTS_CSV=/app/config/target_ingredients.csv   # 선택
 
 # 매핑 옵션
 FUZZY_AUTO_THRESHOLD=95

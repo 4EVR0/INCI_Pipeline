@@ -146,27 +146,24 @@ def synonym_names(reg: dict) -> set[str]:
     return {norm(_PAREN_TAIL.sub("", part)) for part in parts} - {""}
 
 
-def targets_as_gold(targets: pd.DataFrame) -> pd.DataFrame:
-    """GraphRAG target_ingredients.csv → match_gold 입력 형식.
+def regulation_inci_names(reg: dict) -> set[str]:
+    """규제 행 영문명 → 후보 INCI명(대문자). 원문과 그룹 접미사를 뗀 모물질명 두 가지.
 
-    KCIA/CosIng Gold에 없는 성분도 Neo4j Ingredient로 들어간다
-    (예: AZELAIC ACID는 국내 금지라 KCIA에 없지만 target에 있음).
-    inci_name은 alias_list 첫 항목(대문자 INCI), 없으면 query_name 대문자.
+    KCIA Gold에 없는 성분도 제품 전성분을 통해 Neo4j Ingredient가 될 수 있다
+    (예: AZELAIC ACID는 국내 금지라 KCIA에 없음). 규제 데이터 자체에서 INCI명을 만들어
+    출력에 넣으면, 적재 스크립트가 그래프에 실제로 있는 노드와만 조인한다.
     """
-    rows = []
-    for item in targets.to_dict("records"):
-        aliases = [a.strip() for a in _clean(item.get("alias_list")).split("|") if a.strip()]
-        inci = (aliases[0] if aliases else _clean(item.get("query_name"))).upper()
-        if inci:
-            rows.append({"inci_name": inci, "kor_name": _clean(item.get("canonical_name")),
-                         "eng_name": _clean(item.get("query_name")), "kcia_cas_no": ""})
-    return pd.DataFrame(rows, columns=["inci_name", "kor_name", "eng_name", "kcia_cas_no"])
+    raw = _clean(reg.get("ingr_eng_name"))
+    names = {re.sub(r"\s+", " ", name).strip().upper() for name in (raw, _GROUP_EN.sub("", raw))}
+    return names - {""}
 
 
 def match_gold(silver: pd.DataFrame, gold: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Gold 성분별 국내 규제 상태와 review 목록을 반환한다.
 
-    반환 1 (matched): inci_name, kor_name, kr_reg_status, kr_limit_note, match_basis, reg_ids, notice_names
+    반환 1 (matched): inci_name, kor_name, source(gold|mfds_name), kr_reg_status, kr_limit_note,
+                      match_basis, reg_ids, notice_names
+    Gold에 없는 이름은 규제 행 영문명에서 만든 후보 INCI명(source=mfds_name)으로 출력한다.
     반환 2 (review):  자동 적용하지 않은 CAS/이명 일치 후보 + 금지/한도 교차검증으로 낮춘 행
     """
     required = {"inci_name", "kor_name", "eng_name", "kcia_cas_no"}
@@ -194,7 +191,7 @@ def match_gold(silver: pd.DataFrame, gold: pd.DataFrame) -> tuple[pd.DataFrame, 
             continue
         group = groups.setdefault(inci, {"inci_name": inci, "kor_names": [], "inci": {norm(inci)},
                                          "en": set(), "ko": set(),
-                                         "cas": set(), "kcia_cas_no": []})
+                                         "cas": set(), "kcia_cas_no": [], "source": "gold"})
         kor = _clean(row.get("kor_name"))
         if kor and kor not in group["kor_names"]:
             group["kor_names"].append(kor)
@@ -203,6 +200,17 @@ def match_gold(silver: pd.DataFrame, gold: pd.DataFrame) -> tuple[pd.DataFrame, 
         group["cas"] |= cas_set(row.get("kcia_cas_no"))
         if _clean(row.get("kcia_cas_no")):
             group["kcia_cas_no"].append(_clean(row.get("kcia_cas_no")))
+
+    gold_keys = {key for group in groups.values() for key in group["inci"]}
+    for reg in silver.to_dict("records"):
+        for inci in regulation_inci_names(reg):
+            if norm(inci) in gold_keys:
+                continue
+            group = groups.setdefault(inci, {"inci_name": inci, "kor_names": [], "inci": {norm(inci)},
+                                             "en": set(), "ko": set(), "cas": set(), "kcia_cas_no": [],
+                                             "source": "mfds_name"})
+            if reg["ingr_std_name"] and reg["ingr_std_name"] not in group["kor_names"]:
+                group["kor_names"].append(reg["ingr_std_name"])
 
     matched, review = [], []
     for item in groups.values():
@@ -228,7 +236,8 @@ def match_gold(silver: pd.DataFrame, gold: pd.DataFrame) -> tuple[pd.DataFrame, 
 
         accepted = [reg for rid, reg in hits.items() if is_accepted(reg, bases[rid])]
         for rid, reg in hits.items():
-            if reg not in accepted or reg["limit_note"] == REGL_LIMIT_NOTE:
+            # 규제명 후보(mfds_name)는 규제 데이터에서 만든 이름이라 review 대상이 아니다.
+            if item["source"] == "gold" and (reg not in accepted or reg["limit_note"] == REGL_LIMIT_NOTE):
                 review.append({
                     "inci_name": item["inci_name"],
                     "kor_name": kor_name,
@@ -249,6 +258,7 @@ def match_gold(silver: pd.DataFrame, gold: pd.DataFrame) -> tuple[pd.DataFrame, 
         matched.append({
             "inci_name": item["inci_name"],
             "kor_name": kor_name,
+            "source": item["source"],
             "kr_reg_status": status,
             "kr_limit_note": " / ".join(notes) if status == "restricted" else "",
             "match_basis": "|".join(sorted({"+".join(sorted(bases[r["reg_id"]])) for r in accepted})),
@@ -256,7 +266,7 @@ def match_gold(silver: pd.DataFrame, gold: pd.DataFrame) -> tuple[pd.DataFrame, 
             "notice_names": " | ".join(dict.fromkeys(r["notice_ingr_name"] for r in accepted)),
         })
     matched_df = pd.DataFrame(matched, columns=[
-        "inci_name", "kor_name", "kr_reg_status", "kr_limit_note",
+        "inci_name", "kor_name", "source", "kr_reg_status", "kr_limit_note",
         "match_basis", "reg_ids", "notice_names"])
     review_df = pd.DataFrame(review, columns=[
         "inci_name", "kor_name", "kcia_cas_no", "match_basis", "reg_id", "kr_reg_status",

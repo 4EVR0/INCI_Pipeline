@@ -6,7 +6,7 @@ import requests
 
 from pipeline.mfds_regulation.collect import fetch_all, fetch_page
 from pipeline.mfds_regulation.transform import (
-    REGL_LIMIT_NOTE, build_silver, classify_row, match_gold, targets_as_gold)
+    REGL_LIMIT_NOTE, build_silver, classify_row, match_gold)
 
 
 def _kr(std, eng, reg_type="금지", cas="", syn="", notice=None, provis=None, limit=None, country="한국"):
@@ -57,7 +57,8 @@ def test_group_suffix_matches_parent_but_not_derivatives():
                  ("POTASSIUM AZELAOYL DIGLYCINATE", "포타슘아젤로일다이글리시네이트",
                   "Potassium Azelaoyl Diglycinate", ""))
     matched, _ = match_gold(silver, gold)
-    assert matched.set_index("inci_name")["kr_reg_status"].to_dict() == {"AZELAIC ACID": "banned"}
+    gold_rows = matched[matched["source"] == "gold"]
+    assert gold_rows.set_index("inci_name")["kr_reg_status"].to_dict() == {"AZELAIC ACID": "banned"}
 
 
 def test_cas_or_synonym_only_goes_to_review():
@@ -65,7 +66,7 @@ def test_cas_or_synonym_only_goes_to_review():
     silver = build_silver([_kr("헥센다이오익애씨드,1,6-다이하이드라자이드", "Hexanedioic Acid, 1,6-Dihydrazide",
                                cas="124-04-9", syn="adipate, adipic acid")])
     matched, review = match_gold(silver, _gold(("ADIPIC ACID", "아디픽애씨드", "Adipic Acid", "124-04-9")))
-    assert matched.empty
+    assert "ADIPIC ACID" not in set(matched["inci_name"])
     assert review.iloc[0]["match_basis"] == "cas+synonym"
 
 
@@ -98,11 +99,17 @@ def test_priority_banned_over_restricted_and_duplicate_inci_collapsed():
     assert matched.loc["TALC", "kr_limit_note"] == ""
 
 
-def test_targets_as_gold_uses_first_alias_as_inci():
-    targets = pd.DataFrame([{"canonical_name": "아젤라익애씨드", "query_name": "Azelaic Acid",
-                             "alias_list": "AZELAIC ACID"}])
-    assert targets_as_gold(targets).iloc[0].to_dict() == {
-        "inci_name": "AZELAIC ACID", "kor_name": "아젤라익애씨드", "eng_name": "Azelaic Acid", "kcia_cas_no": ""}
+def test_regulation_names_cover_ingredients_missing_from_gold():
+    # AZELAIC ACID는 KCIA Gold에 없지만 그래프에는 제품 전성분으로 들어올 수 있다.
+    silver = build_silver([AZELAIC, _kr("페녹시에탄올", "Phenoxyethanol", reg_type="한도", limit="1%")])
+    matched, review = match_gold(silver, _gold(("PHENOXYETHANOL", "페녹시에탄올", "Phenoxyethanol", "")))
+    rows = matched.set_index("inci_name")
+    assert rows.loc["AZELAIC ACID", ["source", "kr_reg_status"]].tolist() == ["mfds_name", "banned"]
+    assert rows.loc["AZELAIC ACID, ITS SALTS AND DERIVATIVES", "kr_reg_status"] == "banned"
+    # Gold에 있는 이름은 Gold 행으로 한 번만 나온다.
+    assert rows.loc["PHENOXYETHANOL", ["source", "kr_limit_note"]].tolist() == ["gold", "1%"]
+    assert not matched["inci_name"].duplicated().any()
+    assert review.empty
 
 
 def _payload(items, page, total):
