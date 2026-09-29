@@ -59,6 +59,37 @@ Raw 데이터를 최소 전처리만 거쳐 저장합니다.
 - Silver matched_final → 분석·서빙용 최종 성분 데이터셋
 - Graph-RAG 검색 시스템 활용
 
+### 식약처 국내 규제 필터 (월간 DAG `mfds_regulation`)
+
+식약처 **화장품 사용제한 원료정보**(`CsmtcsUseRstrcInfoService`)의 한국 행으로 성분별
+국내 규제 상태를 만든다. 추천 서버는 `banned`를 후보에서 제외하고 `restricted`는 한도 문구를 보여 준다.
+
+| kr_reg_status | 기준 | 예 | 추천 |
+|---|---|---|---|
+| `banned` | 금지 고시, 단서조항·배합한도·조건 문구 없음 | 아젤라익애씨드, 하이드로퀴논 | 제외 |
+| `conditional` | 금지지만 원료 품질 조건(단서조항, "초과하는", "다만" 등) | 탤크(석면), 리모넨(과산화물가), 코카마이드DEA | 정상 |
+| `restricted` | 한도 또는 배합한도 | 살리실릭애씨드, 페녹시에탄올 1%, 토코페롤 20% | 추천 + `kr_limit_note` |
+
+- `REGULATE_TYPE`은 국가 공통 성분 단위 라벨이라 국내 판정에 쓰지 않는다. 금지로 판정됐지만
+  규제 원료정보(`CsmtcsReglMaterialInfoService`)에서 한국이 `LIMIT_NATIONAL`에도 있으면
+  (녹색3호, 카본블랙) `restricted` + 확인 필요 문구로 낮추고 review로 보낸다.
+- 매칭은 이름 정확 일치(소문자·영숫자·한글만)만 자동 적용한다. "그 염류 및 유도체"는 모물질명만
+  남겨 비교하고 다른 성분명으로 확장하지 않는다(포타슘아젤로일다이글리시네이트는 금지 아님).
+  `banned`는 INCI명 일치 또는 KCIA명+CAS 일치일 때만 적용한다(Gold의 KCIA명 오매핑 방지).
+  CAS·이명 일치는 `kr_regulation_review.csv`로 간다.
+- KCIA Gold에 없는 금지 성분(예: AZELAIC ACID)을 위해 GraphRAG `target_ingredients.csv`도
+  함께 매칭한다(`--targets` 또는 `TARGET_INGREDIENTS_CSV`).
+
+```bash
+# .env: REGULATION_API_KEY (data.go.kr 인코딩/디코딩 키 모두 가능)
+python -m pipeline.mfds_regulation.run                    # 수집 → Silver → Gold
+python -m pipeline.mfds_regulation.run \
+  --raw rstrc.json --raw-regl regl.json --gold gold.csv  # 수집 생략
+```
+
+출력: `data/{bronze,silver,gold}/mfds_regulation/run_id=<id>/`, Neo4j 적재 입력은
+`gold/.../ingredient_kr_regulation.csv`(`inci_name, kr_reg_status, kr_limit_note, ...`).
+
 ### 식약처 성분 API 파일럿 (선택 실행)
 
 [식약처 화장품 원료성분정보 API](https://www.data.go.kr/data/15111774/openapi.do)는
@@ -118,6 +149,7 @@ INCI_data/
 │   │   └── transform/
 │   │       ├── parser.py
 │   │       └── transform.py
+│   ├── mfds_regulation/               # 식약처 국내 규제 필터 (collect, transform, run)
 │   ├── silver_mapping/                # Silver 매핑 파이프라인
 │   │   └── kcia_cosing/
 │   │       ├── config.py
@@ -227,6 +259,10 @@ S3_SILVER_PREFIX=INCI_data_silver/
 # Gold
 S3_GOLD_PREFIX=INCI_data_gold/
 
+# 식약처 규제 필터
+REGULATION_API_KEY=your-data-go-kr-service-key
+TARGET_INGREDIENTS_CSV=/app/config/target_ingredients.csv   # 선택
+
 # 매핑 옵션
 FUZZY_AUTO_THRESHOLD=95
 FUZZY_REVIEW_THRESHOLD=90
@@ -265,7 +301,7 @@ CAS overlap 도입으로 자동 매핑률이 **81.66% → 90.90%** 향상되었�
 
 ```
 bronze_kcia ──┐
-              ├──► silver_mapping ──► gold_pipeline
+              ├──► silver_mapping ──► gold_pipeline ──► mfds_regulation
 bronze_cosing─┘
 ```
 
