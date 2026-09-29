@@ -1,0 +1,40 @@
+{
+  "generated_at_utc": "2026-09-29T07:43:23.216928+00:00",
+  "sources": {
+    "standard": {
+      "title": "기능성화장품 기준 및 시험방법",
+      "file": "기능성화장품+기준+및+시험방법+개정고시(전문).pdf",
+      "sha256": "733fe9222fe4c40916e9f288671a7f4f0fd94e16c71090aa5de1d837aec82da6",
+      "latest_notice": "식품의약품안전처 고시 제2025-89호 (2025.12.16)",
+      "appendices": "별표2 미백, 별표3 주름개선, 별표4 자외선차단, 별표8 여드름, 별표9 탈모"
+    },
+    "annex4": {
+      "title": "기능성화장품 심사에 관한 규정 [별표 4] 자료제출이 생략되는 기능성화장품의 종류",
+      "file": "[별표 4] 자료제출이 생략되는 기능성화장품의 종류(제6조제3항 관련)(기능성화….pdf",
+      "sha256": "d9319f1a710fb652cab4df79eb5254e882228d4b2b84ebcca346df47175c869b",
+      "sections": "1 자외선차단, 2 미백, 3 주름개선, 6 여드름"
+    },
+    "gold": {
+      "file": "kcia_cosing_gold_20260920.csv",
+      "sha256": "9b7a6f14af28dbfd09fe6dde7253653a8aa658f1ca5d169ae3b31d2177836e14"
+    },
+    "mfds_snapshot": {
+      "file": "mfds_ingredients.json",
+      "sha256": "c7a7dd19cba415c1ec0080d2927d5bec312c2a82cb43db2fb1e0b969403f65e5"
+    }
+  },
+  "counts": {
+    "ingredients": 45,
+    "by_function": {
+      "whitening": 9,
+      "anti_wrinkle": 4,
+      "uv_protection": 27,
+      "acne": 1,
+      "hair_loss": 4
+    },
+    "by_match_status": {
+      "matched": 43,
+      "not_equivalent": 2
+    }
+  }
+}
