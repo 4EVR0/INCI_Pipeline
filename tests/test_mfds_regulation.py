@@ -134,3 +134,21 @@ def test_fetch_page_hides_key_on_error():
     with pytest.raises(RuntimeError) as exc:
         fetch_page(session, "secret", "regl", 1)
     assert "secret" not in str(exc.value)
+
+
+def test_load_guards_block_join_drop_and_banned_spike(tmp_path):
+    from pipeline.mfds_regulation.load_neo4j import check_guards, load_rows, run_id_of
+
+    path = tmp_path / "run_id=mfds_regulation_20260929_000000" / "ingredient_kr_regulation.csv"
+    path.parent.mkdir()
+    path.write_text("inci_name,source,kr_reg_status,kr_limit_note\n"
+                    "AZELAIC ACID,mfds_name,banned,\nPHENOXYETHANOL,gold,restricted,1%\n"
+                    "TALC,gold,conditional,무시\n", encoding="utf-8-sig")
+    rows = load_rows(path)
+    assert run_id_of(path) == "mfds_regulation_20260929_000000"
+    assert [r["kr_limit_note"] for r in rows] == ["", "1%", ""]
+
+    assert check_guards(rows, currently_tagged=4, max_banned=10) == []
+    assert check_guards(rows, currently_tagged=0, max_banned=10) == []   # 최초 적재
+    assert "CSV 또는 이름 이상" in check_guards(rows, currently_tagged=166, max_banned=10)[0]
+    assert "banned 1개 > 한도 0개" in check_guards(rows, currently_tagged=0, max_banned=0)[0]
