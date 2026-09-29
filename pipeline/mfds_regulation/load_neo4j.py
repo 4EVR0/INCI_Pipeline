@@ -9,8 +9,8 @@
     · 조인되는 banned 성분 수가 KR_REG_MAX_BANNED(기본 10) 초과
 - 결과는 CSV 옆 load_result.json에 남긴다.
 
-GraphRAG_Pipeline scripts/load_kr_regulation_to_neo4j.py 와 같은 Cypher를 쓴다
-(벌크 재임포트 후 수동 재적재용).
+적재 로직은 이 모듈 한 곳에만 둔다. GraphRAG 벌크 재임포트(그래프 덮어쓰기) 후에도
+이 명령으로 다시 적재한다(재임포트 직후엔 규제 표시가 0개라 조인 급감 안전장치에 걸리지 않음).
 
 롤백:  MATCH (i:Ingredient) REMOVE i.kr_reg_status, i.kr_limit_note, i.kr_reg_run_id
 
