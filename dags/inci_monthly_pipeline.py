@@ -4,10 +4,11 @@ INCI 데이터 파이프라인 월간 DAG
 
 실행 순서:
   bronze_kcia ─┐
-               ├─▶ silver_mapping ─▶ gold_pipeline ─▶ mfds_regulation
+               ├─▶ silver_mapping ─▶ gold_pipeline ─▶ mfds_regulation ─▶ mfds_regulation_load
   bronze_cosing┘
 
 mfds_regulation: 식약처 사용제한 원료정보 수집 → 국내 규제 상태(kr_reg_status) 매칭 (최신 Gold 사용)
+mfds_regulation_load: 결과를 Neo4j Ingredient에 적재. 조인 급감·banned 급증이면 적재하지 않고 실패
 """
 
 from __future__ import annotations
@@ -128,5 +129,12 @@ with DAG(
         **COMMON,
     )
 
+    mfds_regulation_load = DockerOperator(
+        task_id="mfds_regulation_load",
+        command="python -m pipeline.mfds_regulation.load_neo4j",
+        execution_timeout=timedelta(minutes=10),
+        **{**COMMON, "retries": 0},  # 안전장치 실패는 재시도해도 같으므로 바로 사람에게 알림
+    )
+
     # bronze 둘 다 완료돼야 silver 시작
-    [bronze_kcia, bronze_cosing] >> silver_mapping >> gold_pipeline >> mfds_regulation
+    [bronze_kcia, bronze_cosing] >> silver_mapping >> gold_pipeline >> mfds_regulation >> mfds_regulation_load

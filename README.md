@@ -91,6 +91,16 @@ python -m pipeline.mfds_regulation.run \
 출력: `data/{bronze,silver,gold}/mfds_regulation/run_id=<id>/`, Neo4j 적재 입력은
 `gold/.../ingredient_kr_regulation.csv`(`inci_name, kr_reg_status, kr_limit_note, ...`).
 
+**Neo4j 자동 적재** (DAG `mfds_regulation_load`): 최신 결과를 그래프 `Ingredient`에 SET한다.
+그래프에 있는 노드와만 조인하고, CSV에 없는 노드는 `none`으로 되돌린다. 아래면 적재하지 않고
+태스크가 실패한다(재시도 없음). 결과는 CSV 옆 `load_result.json`.
+- 조인 성분 수가 현재 규제 표시 성분 수의 50% 미만
+- 조인되는 banned 성분이 `KR_REG_MAX_BANNED`(기본 10) 초과
+
+```bash
+python -m pipeline.mfds_regulation.load_neo4j --dry-run   # 적재 없이 확인
+```
+
 ### 식약처 성분 API 파일럿 (선택 실행)
 
 [식약처 화장품 원료성분정보 API](https://www.data.go.kr/data/15111774/openapi.do)는
@@ -262,6 +272,10 @@ S3_GOLD_PREFIX=INCI_data_gold/
 
 # 식약처 규제 필터
 REGULATION_API_KEY=your-data-go-kr-service-key
+NEO4J_URI=bolt://your-neo4j-host:7687   # 규제 상태 자동 적재
+NEO4J_USER=neo4j
+NEO4J_PASSWORD=your-neo4j-password
+KR_REG_MAX_BANNED=10
 
 # 매핑 옵션
 FUZZY_AUTO_THRESHOLD=95
@@ -301,7 +315,7 @@ CAS overlap 도입으로 자동 매핑률이 **81.66% → 90.90%** 향상되었�
 
 ```
 bronze_kcia ──┐
-              ├──► silver_mapping ──► gold_pipeline ──► mfds_regulation
+              ├──► silver_mapping ──► gold_pipeline ──► mfds_regulation ──► mfds_regulation_load
 bronze_cosing─┘
 ```
 
