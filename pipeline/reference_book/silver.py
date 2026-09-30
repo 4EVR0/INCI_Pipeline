@@ -49,7 +49,7 @@ MANUAL_INCI: dict[tuple[int, str], list[str]] = {
     (30, "달맞이꽃씨오일"): ["OENOTHERA BIENNIS OIL"],              # 달맞이꽃 오일 INCI = 씨 오일
     (31, "대나무추출물"): [],                                      # 뿌리·순 혼합 일반명, 단일 INCI 없음
     (34, "라벤더추출물"): ["LAVANDULA ANGUSTIFOLIA ANGUSTIFOLIA HERB EXTRACT"],  # herb = 지상부(전초)
-    # 보류: (31, "대나무수액") — BAMBUSA VULGARIS SAP EXTRACT vs BAMBUSA VULGARIS WATER
+    (31, "대나무수액"): ["BAMBUSA VULGARIS SAP EXTRACT"],          # 수액 ↔ SAP EXTRACT (WATER는 다른 원료일 수 있음)
 }
 
 
