@@ -122,6 +122,30 @@ python -m pipeline.mfds_functional.run \
   --mfds-snapshot dev_data/mfds-pilot/full-20260926/mfds_ingredients.json   # pdftotext(poppler) 필요
 ```
 
+### 성분사전 근거 (`pipeline/reference_book`, Bronze → Silver → Gold)
+
+「화장품성분학 사전」(김기연 외, 현문사, 2011)에서 진정·보습 등 **법정 기능성 밖의 효능 근거**를 만든다.
+KCIA/CosIng와 같은 메달리온 구조. 책은 바뀌지 않는 자료라 월간 DAG 밖에서 추출 추가·검토 반영 시에만 수동 실행한다.
+책 원문이 들어가므로 입력(`dev_data/`)·출력(`data/`)은 모두 git에서 제외된다. **그래프에는 아직 적재하지 않는다.**
+
+| 단계 | 내용 | 산출물 (`data/<layer>/reference_book/run_id=…/`) |
+|---|---|---|
+| Bronze | 스캔 이미지에서 추출한 항목 그대로 + 스키마 검증(`bronze.py`) | `entries.jsonl` |
+| Silver | KCIA/CosIng Gold와 INCI 매칭 + 근거 규칙(`silver.py`) | `matched.csv` / `review.csv` / `unmatched.csv` |
+| Gold | matched 중 근거 있는 항목을 성분×효능으로 합침(`gold.py`) | `reference_book_evidence.csv` |
+
+- 추출(Bronze 입력): 항목별 원문, 화장품 용도, 피부 효능 주장→효능 코드, 제외 주장(섭취·전신·모발·의약 표현), 주의 문구
+- 매칭: 책 영문명이 Gold `inci_name`과 직접 일치할 때만 자동. Gold는 `eng_name`과 `inci_name`이 다른 성분인 행이 있어
+  (예: 감자전분 → AVENA SATIVA STARCH) 나머지는 `review.csv`로 보내고 `silver.MANUAL_INCI`로만 확정
+- 규칙: 용도만 있는 항목은 근거 없음. 책에 자극·광독성 주의 문구가 있거나 정유(휘발성 오일)이면 진정·항염 근거 제외
+
+```bash
+python -m pipeline.reference_book.run --stage all \
+  --entries "dev_data/dictionary-poc/entries_part1_*.jsonl" --gold <kcia_cosing_gold_ingredients.csv>
+python -m pipeline.reference_book.run --stage silver   # MANUAL_INCI 반영 후 최신 bronze부터 다시
+python -m pipeline.reference_book.run --stage gold
+```
+
 ### 식약처 성분 API 파일럿 (선택 실행)
 
 [식약처 화장품 원료성분정보 API](https://www.data.go.kr/data/15111774/openapi.do)는
