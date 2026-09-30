@@ -101,6 +101,27 @@ python -m pipeline.mfds_regulation.run \
 python -m pipeline.mfds_regulation.load_neo4j --dry-run   # 적재 없이 확인
 ```
 
+### 식약처 기능성화장품 고시 원료 (`config/mfds_functional_ingredients.csv`)
+
+"고민 → 성분" 공식 근거로 쓰기 위한 고시 원료 목록. 고시가 개정될 때만 수동으로 다시 만든다.
+**아직 그래프에 적재하지 않는다**(순위 반영 여부는 A/B 후 결정).
+
+- 출처(두 문서를 합침): 「기능성화장품 기준 및 시험방법」 각조(별표2 미백, 3 주름개선, 4 자외선차단, 8 여드름, 9 탈모) +
+  「기능성화장품 심사에 관한 규정」 [별표 4](성분·함량). 예: 마그네슘아스코빌포스페이트는 [별표 4]에만 있음
+- 컬럼: `kor_name, function, inci_name, match_status, max_content, condition, effect_codes, sources, review_note`
+- 매칭: 옛 표기(에칠·메칠·디·트리)를 현행 표준명으로 바꿔 Gold 한글명 → 식약처 원료 DB 순으로 정확 일치만.
+  `match.py`의 `MANUAL_INCI`(사람 확정), `NOT_EQUIVALENT`(비슷한 일반 추출물과 동일시하지 않음)로 보정
+- 여드름(살리실릭애씨드)은 인체세정용(씻어내는) 제품에 한정된 기능성이라 `condition`에 기록
+- PDF는 커밋하지 않고 SHA-256·고시 번호를 `config/mfds_functional_ingredients.meta.json`에 남긴다
+
+```bash
+python -m pipeline.mfds_functional.run \
+  --standard-pdf "기능성화장품 기준 및 시험방법 개정고시(전문).pdf" \
+  --annex4-pdf "[별표 4] 자료제출이 생략되는 기능성화장품의 종류.pdf" \
+  --gold <kcia_cosing_gold_ingredients.csv> \
+  --mfds-snapshot dev_data/mfds-pilot/full-20260926/mfds_ingredients.json   # pdftotext(poppler) 필요
+```
+
 ### 식약처 성분 API 파일럿 (선택 실행)
 
 [식약처 화장품 원료성분정보 API](https://www.data.go.kr/data/15111774/openapi.do)는
