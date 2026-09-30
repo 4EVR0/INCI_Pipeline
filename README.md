@@ -122,6 +122,24 @@ python -m pipeline.mfds_functional.run \
   --mfds-snapshot dev_data/mfds-pilot/full-20260926/mfds_ingredients.json   # pdftotext(poppler) 필요
 ```
 
+### 성분사전 근거 후보 (`pipeline/reference_book`)
+
+「화장품성분학 사전」(김기연 외, 현문사, 2011) 항목에서 진정·보습 등 **법정 기능성 밖의 효능 근거**를 만든다.
+책 원문이 들어가므로 입력(`dev_data/`)·출력(`data/`)은 모두 git에서 제외된다. **그래프에는 아직 적재하지 않는다.**
+
+1. 추출(수동): 스캔 페이지 이미지를 읽어 항목별 JSONL 작성. 스키마는 `entries.py` 문서 참고.
+   원문, 화장품 용도(roles), 피부 효능 주장(skin_claims)→효능 코드, 제외 주장(섭취·전신·모발·의약 표현), 주의 문구
+2. 매칭·근거 생성:
+   - 자동 매칭은 책 영문명이 Gold `inci_name`과 직접 일치할 때만. Gold는 `eng_name`과 `inci_name`이 다른 성분인 행이 있어
+     (예: 감자전분 → AVENA SATIVA STARCH) `eng_name`·한글명 일치는 검토 목록으로 보내고 `build.MANUAL_INCI`로만 확정
+   - 용도만 있는 항목은 근거를 만들지 않음
+   - 책에 자극·광독성 주의 문구가 있거나 정유(휘발성 오일)이면 진정·항염 근거를 만들지 않음(계피유·라벤더오일 등)
+
+```bash
+python -m pipeline.reference_book.run \
+  --entries "dev_data/dictionary-poc/entries_part1_*.jsonl" --gold <kcia_cosing_gold_ingredients.csv>
+```
+
 ### 식약처 성분 API 파일럿 (선택 실행)
 
 [식약처 화장품 원료성분정보 API](https://www.data.go.kr/data/15111774/openapi.do)는
