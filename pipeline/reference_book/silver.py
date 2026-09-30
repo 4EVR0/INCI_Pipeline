@@ -1,4 +1,9 @@
-"""사전 항목 → Gold INCI 매칭 → 근거 후보(reference_book) 생성.
+"""Silver: Bronze 항목 → KCIA/CosIng Gold INCI 매칭 + 근거 규칙 적용.
+
+산출물(항목 단위, 모든 Bronze 항목이 셋 중 하나에 들어간다):
+  matched    자동 매칭 또는 사람 확정(MANUAL_INCI). partial은 자동으로 확정된 INCI만 여기 들어간다
+  review     근거를 만드는 미확정 항목(needs_review·ambiguous·unmatched·partial의 나머지) → 사람이 MANUAL_INCI로 확정
+  unmatched  근거가 없어 검토할 필요가 없는 미확정 항목, 사람이 매칭 없음으로 확정한 항목(rejected)
 
 매칭(정확 일치만, 추측 금지). 책 영문명마다 따로 판단한다:
   - 자동 매칭: 책 영문명 == Gold inci_name (소문자·영숫자만, 괄호 속 일반명 제거 후 비교 포함)이고 후보가 1개
@@ -20,8 +25,6 @@ from typing import Iterable
 
 import pandas as pd
 
-BOOK_CITATION = "김기연 외, 『화장품성분학 사전』, 현문사, 2011 (ISBN 9788966300891)"
-EVIDENCE_TYPE = "reference_book"
 CAUTION_BLOCKED_EFFECTS = frozenset({"SOOTHING", "ANTI_INFLAMMATORY"})
 ESSENTIAL_OIL_MARKERS = ("휘발성 오일", "정유(")
 # 사람이 확정한 매칭. 키: (인쇄 쪽, 책 국문명) → Gold inci_name 목록
@@ -103,10 +106,16 @@ def match_entry(entry: dict, index: dict[tuple[str, str], set[str]]) -> tuple[li
     return sorted(auto), sorted(candidates), status
 
 
-def build(entries: Iterable[dict], gold: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-    """(entries 요약, evidence 후보, review) 반환."""
+SILVER_COLUMNS = [
+    "print_page", "pdf_page", "kor_name", "book_inci", "match_status", "inci_names", "review_candidates",
+    "claim_scope", "effect_codes", "blocked_effects", "skin_claims", "caution", "bronze_source",
+]
+
+
+def build_silver(entries: Iterable[dict], gold: pd.DataFrame) -> dict[str, pd.DataFrame]:
+    """{'matched', 'review', 'unmatched'} DataFrame. 효능은 주의 문구·정유 규칙을 적용한 뒤의 값."""
     index = build_gold_index(gold)
-    summary, evidence, review = [], [], []
+    out: dict[str, list[dict]] = {"matched": [], "review": [], "unmatched": []}
     for entry in entries:
         incis, candidates, status = match_entry(entry, index)
         effects = list(entry["effect_codes"])
@@ -114,41 +123,21 @@ def build(entries: Iterable[dict], gold: pd.DataFrame) -> tuple[pd.DataFrame, pd
                    if entry.get("caution") or is_essential_oil(entry) else [])
         effects = [e for e in effects if e not in blocked]
         gives_evidence = entry["claim_scope"] in ("skin", "general") and bool(effects)
-        summary.append({
-            "print_page": entry["print_page"], "kor_name": entry["kor_name"],
+        row = {
+            "print_page": entry["print_page"], "pdf_page": entry["pdf_page"], "kor_name": entry["kor_name"],
             "book_inci": " | ".join(entry["inci_names"]), "match_status": status,
             "inci_names": " | ".join(incis), "review_candidates": " | ".join(candidates),
             "claim_scope": entry["claim_scope"], "effect_codes": "|".join(effects),
-            "blocked_by_caution": "|".join(blocked), "caution": entry.get("caution", ""),
-            "source": entry.get("_source", ""),
-        })
-        # 근거를 만드는 항목만 검토 대상으로 낸다(용도만 있는 항목의 매칭은 근거에 쓰이지 않음).
-        if status not in ("matched", "rejected") and gives_evidence:
-            review.append({"print_page": entry["print_page"], "kor_name": entry["kor_name"],
-                           "book_inci": " | ".join(entry["inci_names"]), "status": status,
-                           "auto_matched": " | ".join(incis), "candidates": " | ".join(candidates),
-                           "effect_codes": "|".join(effects)})
-        if not gives_evidence:
-            continue
-        for inci in incis:
-            for effect in effects:
-                evidence.append({
-                    "inci_name": inci, "effect_code": effect, "evidence_type": EVIDENCE_TYPE,
-                    "claim_scope": entry["claim_scope"], "print_page": entry["print_page"],
-                    "book_kor_name": entry["kor_name"], "claims": " / ".join(entry["skin_claims"]),
-                    "citation": BOOK_CITATION,
-                })
-    evidence_df = pd.DataFrame(evidence, columns=[
-        "inci_name", "effect_code", "evidence_type", "claim_scope", "print_page",
-        "book_kor_name", "claims", "citation"])
-    # 같은 성분·효능을 여러 항목이 말하면 skin 범위를 우선해 하나로 합친다.
-    if not evidence_df.empty:
-        evidence_df["_rank"] = (evidence_df["claim_scope"] != "skin").astype(int)
-        evidence_df = (evidence_df.sort_values(["inci_name", "effect_code", "_rank", "print_page"])
-                       .groupby(["inci_name", "effect_code"], as_index=False)
-                       .agg({"evidence_type": "first", "claim_scope": "first",
-                             "print_page": lambda s: "|".join(map(str, dict.fromkeys(s))),
-                             "book_kor_name": lambda s: "|".join(dict.fromkeys(s)),
-                             "claims": "first", "citation": "first"}))
-    return pd.DataFrame(summary), evidence_df, pd.DataFrame(review, columns=[
-        "print_page", "kor_name", "book_inci", "status", "auto_matched", "candidates", "effect_codes"])
+            "blocked_effects": "|".join(blocked), "skin_claims": " / ".join(entry["skin_claims"]),
+            "caution": entry.get("caution", ""),
+            "bronze_source": entry.get("extraction_source") or entry.get("_source", ""),
+        }
+        if incis:
+            out["matched"].append(row)
+        # 근거를 만드는 미확정 항목은 모두 검토 대상(후보가 없는 unmatched도 사람이 INCI를 찾아 확정할 수 있음).
+        # partial은 자동 확정분은 matched, 나머지는 review로 보낸다.
+        if status in ("partial", "needs_review", "ambiguous", "unmatched") and gives_evidence:
+            out["review"].append(row)
+        elif not incis:
+            out["unmatched"].append(row)
+    return {name: pd.DataFrame(rows, columns=SILVER_COLUMNS) for name, rows in out.items()}

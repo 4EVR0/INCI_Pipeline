@@ -3,14 +3,16 @@ import json
 import pandas as pd
 import pytest
 
-from pipeline.reference_book import build as book
-from pipeline.reference_book.entries import load_entries, validate
+from pipeline.reference_book import run as pipeline_run
+from pipeline.reference_book import silver
+from pipeline.reference_book.bronze import load_entries, validate
+from pipeline.reference_book.gold import build_gold
 
 
 def _entry(kor, inci, effects=(), scope="skin", **extra):
-    return {"pdf_page": 1, "print_page": 12, "kor_name": kor, "inci_names": list(inci), "text": extra.pop("text", ""),
-            "roles": [], "skin_claims": ["주장"] if effects else [], "effect_codes": list(effects),
-            "claim_scope": scope, "excluded_claims": [], **extra}
+    return {"pdf_page": 1, "print_page": extra.pop("print_page", 12), "kor_name": kor, "inci_names": list(inci),
+            "text": extra.pop("text", ""), "roles": [], "skin_claims": ["주장"] if effects else [],
+            "effect_codes": list(effects), "claim_scope": scope, "excluded_claims": [], **extra}
 
 
 GOLD = pd.DataFrame([
@@ -24,66 +26,90 @@ GOLD = pd.DataFrame([
 ])
 
 
-def _build(*entries):
-    summary, evidence, review = book.build(list(entries), GOLD)
-    return summary.set_index("kor_name"), evidence, review.set_index("kor_name")
+def _silver(*entries):
+    return {k: v.set_index("kor_name") for k, v in silver.build_silver(list(entries), GOLD).items()}
 
 
-def test_only_direct_inci_matches_are_automatic():
-    summary, evidence, review = _build(
+def test_silver_auto_matches_only_direct_inci():
+    tables = _silver(
         _entry("글루코오스", ["Glucose"], ["MOISTURE_RETENTION"]),
         _entry("가지추출물", ["Solanum Melongena(Eggplant) Fruit Extract"], ["SOOTHING"]),
+        _entry("감자전분", ["Solanum Tuberosum(Potato) Starch"], scope="role_only"),
+        _entry("감초", ["Glycyrrhiza Glabra(Licorice)"], ["BRIGHTENING"]),
     )
-    assert summary.loc["글루코오스", "match_status"] == "matched"
-    assert summary.loc["가지추출물", "match_status"] == "needs_review"
-    assert review.loc["가지추출물", "candidates"] == "SOLANUM MELONGENA ROOT EXTRACT"
-    assert set(evidence["inci_name"]) == {"GLUCOSE"}
+    assert list(tables["matched"].index) == ["글루코오스"]
+    # 후보가 전혀 없어도 근거가 있으면 사람이 확정할 수 있도록 검토 목록으로
+    assert tables["review"].loc["감초", "match_status"] == "unmatched"
+    assert tables["review"].loc["가지추출물", "review_candidates"] == "SOLANUM MELONGENA ROOT EXTRACT"
+    # 근거가 없는 항목은 검토하지 않고 unmatched로
+    assert tables["unmatched"].loc["감자전분", "match_status"] == "needs_review"
 
 
-def test_each_book_name_is_matched_independently():
-    summary, evidence, review = _build(_entry(
+def test_silver_partial_goes_to_both_matched_and_review():
+    tables = _silver(_entry(
         "감초추출물", ["Glycyrrhiza Glabra(Licorice) Root Extract", "Glycyrrhiza Inflata Root Extract"], ["BRIGHTENING"]))
-    assert summary.loc["감초추출물", "match_status"] == "partial"
-    assert list(evidence["inci_name"]) == ["GLYCYRRHIZA INFLATA ROOT EXTRACT"]
-    assert "감초추출물" in review.index
+    assert tables["matched"].loc["감초추출물", "inci_names"] == "GLYCYRRHIZA INFLATA ROOT EXTRACT"
+    assert tables["review"].loc["감초추출물", "match_status"] == "partial"
+    assert tables["unmatched"].empty
 
 
-def test_caution_and_essential_oil_block_soothing_but_keep_other_effects():
-    _, evidence, _ = _build(
+def test_silver_blocks_soothing_for_caution_and_essential_oil():
+    tables = _silver(
         _entry("글루코오스", ["Glucose"], ["SOOTHING", "HYDRATING"], caution="피부에 자극을 줄 수 있다"),
         _entry("결명자추출물", ["Cassia Obtusifolia Seed Extract"], ["SOOTHING", "ANTI_INFLAMMATORY", "BRIGHTENING"],
                text="수증기 증류법으로 얻은 휘발성 오일이다."),
     )
-    assert set(map(tuple, evidence[["inci_name", "effect_code"]].values)) == {
-        ("GLUCOSE", "HYDRATING"), ("CASSIA OBTUSIFOLIA SEED EXTRACT", "BRIGHTENING")}
+    matched = tables["matched"]
+    assert matched.loc["글루코오스", ["effect_codes", "blocked_effects"]].tolist() == ["HYDRATING", "SOOTHING"]
+    assert matched.loc["결명자추출물", "effect_codes"] == "BRIGHTENING"
 
 
-def test_role_only_entries_give_no_evidence_or_review():
-    summary, evidence, review = _build(_entry("감자전분", ["Solanum Tuberosum(Potato) Starch"], scope="role_only"))
-    assert evidence.empty and review.empty
-    assert summary.loc["감자전분", "match_status"] == "needs_review"
+def test_manual_rejection(monkeypatch):
+    monkeypatch.setitem(silver.MANUAL_INCI, (12, "가지추출물"), [])
+    tables = _silver(_entry("가지추출물", ["Solanum Melongena(Eggplant) Fruit Extract"], ["SOOTHING"]))
+    assert tables["review"].empty
+    assert tables["unmatched"].loc["가지추출물", "match_status"] == "rejected"
 
 
-def test_manual_mapping_overrides(monkeypatch):
-    monkeypatch.setitem(book.MANUAL_INCI, (12, "가지추출물"), [])
-    summary, evidence, review = _build(
-        _entry("가지추출물", ["Solanum Melongena(Eggplant) Fruit Extract"], ["SOOTHING"]))
-    assert summary.loc["가지추출물", "match_status"] == "rejected"
-    assert evidence.empty and review.empty
+def test_gold_uses_matched_evidence_only_and_prefers_skin_scope():
+    matched = silver.build_silver([
+        _entry("글루코오스", ["Glucose"], ["HYDRATING"], scope="general"),
+        _entry("글루코오스", ["Glucose"], ["HYDRATING"], print_page=13),
+        _entry("감초추출물", ["Glycyrrhiza Inflata Root Extract"], scope="role_only"),
+    ], GOLD)["matched"]
+    evidence = build_gold(matched)
+    assert evidence[["inci_name", "effect_code", "claim_scope", "print_page"]].values.tolist() == [
+        ["GLUCOSE", "HYDRATING", "skin", "13|12"]]
 
 
-def test_duplicate_evidence_prefers_skin_scope():
-    a = _entry("글루코오스", ["Glucose"], ["HYDRATING"], scope="general")
-    b = dict(_entry("글루코오스", ["Glucose"], ["HYDRATING"]), print_page=13)
-    _, evidence, _ = _build(a, b)
-    assert len(evidence) == 1
-    assert evidence.iloc[0]["claim_scope"] == "skin"
-    assert evidence.iloc[0]["print_page"] == "13|12"
-
-
-def test_validation_rejects_bad_entries(tmp_path):
+def test_bronze_validation():
     assert validate(_entry("x", [], ["NOT_AN_EFFECT"]), "t")[0].startswith("t: 알 수 없는")
     assert any("role_only" in p for p in validate(_entry("x", [], ["HYDRATING"], scope="role_only"), "t"))
+
+
+def test_stages_end_to_end(tmp_path):
+    source = tmp_path / "entries_a.jsonl"
+    source.write_text("\n".join(json.dumps(e, ensure_ascii=False) for e in [
+        _entry("글루코오스", ["Glucose"], ["HYDRATING"]),
+        _entry("가지추출물", ["Solanum Melongena(Eggplant) Fruit Extract"], ["SOOTHING"]),
+    ]), encoding="utf-8")
+    gold_csv = tmp_path / "kcia.csv"
+    GOLD.to_csv(gold_csv, index=False)
+    root = tmp_path / "data"
+    bronze = pipeline_run.run_bronze(str(source), root, "r1")
+    first = json.loads((bronze / "entries.jsonl").read_text(encoding="utf-8").splitlines()[0])
+    assert first["extraction_source"] == "entries_a.jsonl:1"
+    silver_dir = pipeline_run.run_silver(root, "r2", gold_csv)
+    matched = pd.read_csv(silver_dir / "matched.csv", dtype=str)
+    assert matched["bronze_source"].tolist() == ["entries_a.jsonl:1"]
+    gold_dir = pipeline_run.run_gold(root, "r3")
+    evidence = pd.read_csv(gold_dir / "reference_book_evidence.csv")
+    assert evidence[["inci_name", "effect_code"]].values.tolist() == [["GLUCOSE", "HYDRATING"]]
+    assert json.loads((silver_dir / "metadata.json").read_text())["counts"] == {
+        "matched": 1, "review": 1, "unmatched": 0}
+
+
+def test_duplicate_entries_rejected(tmp_path):
     path = tmp_path / "a.jsonl"
     path.write_text("\n".join(json.dumps(_entry(k, [])) for k in ("가", "가")), encoding="utf-8")
     with pytest.raises(ValueError, match="중복 항목"):
