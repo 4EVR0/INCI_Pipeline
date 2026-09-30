@@ -27,8 +27,30 @@ import pandas as pd
 
 CAUTION_BLOCKED_EFFECTS = frozenset({"SOOTHING", "ANTI_INFLAMMATORY"})
 ESSENTIAL_OIL_MARKERS = ("휘발성 오일", "정유(")
-# 사람이 확정한 매칭. 키: (인쇄 쪽, 책 국문명) → Gold inci_name 목록
-MANUAL_INCI: dict[tuple[int, str], list[str]] = {}
+# 사람이 확정한 매칭. 키: (인쇄 쪽, 책 국문명) → Gold inci_name 목록. 빈 목록 = 매칭 없음으로 확정(rejected).
+# 기준: 같은 식물·부위·형태이고 INCI 표기만 다르면 인정. 부위·형태가 다르거나 넓은 묶음에 붙이는 경우 거절.
+MANUAL_INCI: dict[tuple[int, str], list[str]] = {
+    # 1부 PDF 1~20쪽 검토 (2026-09-30)
+    (12, "가공소금"): [],                                          # 표준 INCI 없음
+    (12, "가시오갈피뿌리추출물"): ["ACANTHOPANAX SENTICOSUS EXTRACT"],  # Gold가 KCIA 뿌리추출물 행을 이 INCI로 묶음
+    (12, "가지추출물"): [],                                        # 열매 ↔ ROOT EXTRACT 부위 다름
+    (13, "갈근추출물"): [],                                        # 뿌리 ↔ FLOWER EXTRACT 부위 다름
+    (14, "감자추출물"): [],                                        # 과육 ↔ CALLUS CULTURE EXTRACT 형태 다름
+    (14, "감초"): ["GLYCYRRHIZA GLABRA RHIZOME/ROOT"],             # 뿌리·뿌리줄기
+    (15, "감초추출물"): ["GLYCYRRHIZA INFLATA ROOT EXTRACT", "GLYCYRRHIZA URALENSIS ROOT EXTRACT",
+                     "GLYCYRRHIZA GLABRA RHIZOME/ROOT EXTRACT"],   # Root ↔ Rhizome/Root 표기 차이
+    (15, "감초플라보노이드"): [],                                   # 대응 INCI 없음
+    (16, "검은깨추출물"): [],                                      # 추출물 ↔ SEED BUTTER 형태 다름
+    (16, "겐티아나추출물"): ["GENTIANA LUTEA RHIZOME/ROOT EXTRACT"],  # 표기 차이
+    (16, "겨우살이추출물"): ["VISCUM ALBUM (MISTLETOE)"],            # Gold가 KCIA 추출물 행을 이 이름으로 묶음
+    (17, "고추냉이뿌리발효추출물"): [],                               # 발효물 INCI 없음
+    (20, "굴추출물"): ["OSTREA EDULIS EXTRACT"],                    # KCIA 굴추출물 행의 INCI
+    (30, "다시마추출물"): [],                                      # ALGAE EXTRACT(조류 전체)는 과대 적용
+    (30, "달맞이꽃씨오일"): ["OENOTHERA BIENNIS OIL"],              # 달맞이꽃 오일 INCI = 씨 오일
+    (31, "대나무추출물"): [],                                      # 뿌리·순 혼합 일반명, 단일 INCI 없음
+    (34, "라벤더추출물"): ["LAVANDULA ANGUSTIFOLIA ANGUSTIFOLIA HERB EXTRACT"],  # herb = 지상부(전초)
+    # 보류: (31, "대나무수액") — BAMBUSA VULGARIS SAP EXTRACT vs BAMBUSA VULGARIS WATER
+}
 
 
 def is_essential_oil(entry: dict) -> bool:

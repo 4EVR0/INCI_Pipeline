@@ -9,6 +9,12 @@ from pipeline.reference_book.bronze import load_entries, validate
 from pipeline.reference_book.gold import build_gold
 
 
+@pytest.fixture(autouse=True)
+def _isolate_manual_review(monkeypatch):
+    # 실제 검토 결과(MANUAL_INCI)가 가짜 테스트 데이터와 같은 키를 쓸 수 있어 비운 상태로 검증한다.
+    monkeypatch.setattr(silver, "MANUAL_INCI", {})
+
+
 def _entry(kor, inci, effects=(), scope="skin", **extra):
     return {"pdf_page": 1, "print_page": extra.pop("print_page", 12), "kor_name": kor, "inci_names": list(inci),
             "text": extra.pop("text", ""), "roles": [], "skin_claims": ["주장"] if effects else [],
