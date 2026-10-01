@@ -53,6 +53,29 @@ MANUAL_INCI: dict[tuple[int, str], list[str]] = {
     (31, "대나무추출물"): [],                                      # 뿌리·순 혼합 일반명, 단일 INCI 없음
     (34, "라벤더추출물"): ["LAVANDULA ANGUSTIFOLIA ANGUSTIFOLIA HERB EXTRACT"],  # herb = 지상부(전초)
     (31, "대나무수액"): ["BAMBUSA VULGARIS SAP EXTRACT"],          # 수액 ↔ SAP EXTRACT (WATER는 다른 원료일 수 있음)
+    # 21~40쪽(print 35~58) 검토
+    (36, "로즈마리"): [],                       # 포괄 항목 — 잎 오일/꽃 추출물 중 특정 불가
+    (37, "리보플라빈"): ["LACTOFLAVIN"],         # 동일 물질의 다른 이름
+    (38, "린씨드오일"): [],                     # Gold에는 에스터 유도체만 있음
+    (40, "마늘추출물"): [],                     # 알뿌리 ↔ ROOT
+    (41, "마시멜로뿌리추출물"): [],             # 뿌리 ↔ FLOWER
+    (41, "마치현추출물"): ["PORTULACA OLERACEA FLOWER/LEAF/STEM EXTRACT"],
+    (42, "마카다미아씨오일"): ["MACADAMIA INTEGRIFOLIA SEED OIL", "MACADAMIA INTEGRIFOLIA/TETRAPHYLLA SEED OIL"],
+    (43, "만다린추출물"): [],                   # 열매 ↔ PEEL/다른 종
+    (46, "망고씨오일"): [],                     # 오일 ↔ BUTTER
+    (46, "망고추출물"): [],                     # 열매 ↔ SEED BUTTER
+    (46, "매도우스위트추출물"): [],             # 후보가 ROOT
+    (50, "멜론추출물"): ["CUCUMIS MELO CANTALUPENSIS FRUIT EXTRACT"],
+    (50, "명일엽가루"): ["ANGELICA KEISKEI LEAF/STEM EXTRACT"],  # 가루 ↔ 추출물이나 같은 부위로 인정
+    (51, "모란뿌리추출물"): [],                 # 뿌리 ↔ 가지/꽃/잎·전체 묶음
+    (52, "목화씨오일"): [],                     # 종·형태 다름
+    (53, "무화과나무추출물"): [],               # 후보가 BARK
+    (53, "물냉이꽃/잎추출물"): ["NASTURTIUM OFFICINALE FLOWER/LEAF EXTRACT"],
+    (55, "미모사잎추출물"): [],                 # 잎 ↔ BARK
+    (55, "밀싹추출물"): [],                     # 싹 ↔ 전체 추출물
+    (55, "밀전분"): [],                         # 후보가 귀리 전분(KCIA 매핑 오류 의심)
+    (56, "밍크오일"): [],                       # 오일 ↔ 왁스
+    (58, "바나나추출물"): [],                   # 열매 전체/다른 종만 있음
 }
 
 
