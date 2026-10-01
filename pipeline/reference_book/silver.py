@@ -159,6 +159,19 @@ MANUAL_INCI: dict[tuple[int, str], list[str]] = {
     (139, "우유"): ["LAC"],                     # 우유의 INCI명
     (140, "월계수잎추출물"): [],                # ↔ LEAF 원물/BRANCH EXTRACT
     (141, "위치하젤 추출물"): [],               # 껍질/잔가지 항목이 별도로 있음
+    # 121~140쪽(print 142~163) 검토
+    (143, "유용성감초추출물"): [],
+    (145, "유카추출물"): [],
+    (145, "유칼립투스"): ["EUCALYPTUS GLOBULUS OIL"],   # 효능 설명이 오일에 대한 것
+    (145, "은행잎추출물"): [],                  # Gold에 LEAF EXTRACT 없음(NUT만)
+    (146, "의이인"): [],
+    (151, "인삼꽃추출물"): [],                  # 후보가 HAIRY ROOT EXTRACT
+    (152, "인삼캘러스배양추출물"): [],          # 후보가 HAIRY ROOT EXTRACT
+    (152, "일당귀추출물"): [],                  # 추출물 ↔ ROOT 원물
+    (156, "자근추출물"): [],                    # 추출물 ↔ ROOT 원물
+    (158, "작약추출물"): ["PAEONIA LACTIFLORA ROOT EXTRACT"],
+    (159, "장미꽃추출물"): [],                  # 후보가 캘러스 추출물
+    (163, "지유추출물"): [],                    # ↔ ROOT/STALK POWDER
 }
 
 
