@@ -213,6 +213,41 @@ MANUAL_INCI: dict[tuple[int, str], list[str]] = {
     (251, "효모/홍삼발효여과물"): ["SACCHAROMYCES/PANAX GINSENG ROOT FERMENT FILTRATE"],
     (252, "효모용해추출물"): [],                # ↔ YEAST EXTRACT
     (253, "흑설탕추출물"): [],
+    # 2부(화장품성분 분류, print 259~310) 검토
+    (261, "올리브오일"): [],                    # Gold 오매핑(BUD EXTRACT)
+    (262, "피마자오일"): [],                    # Gold에 SEED OIL 없음
+    (284, "자몽추출물"): [],                    # 후보가 다른 종(CITRUS GRANDIS)
+    (286, "티타늄디옥사이드"): ["CI 77891"],
+    (286, "징크옥사이드"): ["CI 77947"],
+    (287, "벤조페논-n"): [],                    # 계열명
+    (296, "레티놀"): ["RETINOL"],
+    (296, "레티닐팔미테이트"): ["RETINYL PALMITATE"],
+    (296, "아데노신(주름 고시원료)"): ["ADENOSINE"],
+    (296, "폴리에톡실레이티드레틴아마이드"): [],
+    (297, "닥나무추출물"): [],
+    (297, "알부틴(미백 고시원료)"): ["ARBUTIN"],
+    (297, "유용성감초추출물"): [],
+    (297, "에틸아스코빌에테르"): ["3-O-ETHYL ASCORBIC ACID"],
+    (297, "아스코빌글루코사이드"): ["ASCORBYL GLUCOSIDE"],
+    (297, "마그네슘아스코빌포스페이트"): ["MAGNESIUM ASCORBYL PHOSPHATE"],
+    (297, "나이아신아마이드"): ["NIACINAMIDE"],
+    (297, "알파-비사보롤"): ["BISABOLOL"],
+    (297, "아스코빌테트라이소팔미테이트"): ["ASCORBYL TETRAISOPALMITATE"],
+    (297, "루시놀"): ["4-BUTYLRESORCINOL"],
+    (297, "엘라그산"): ["ELLAGIC ACID"],
+    (297, "트라넥삼산"): ["TRANEXAMIC ACID"],
+    (297, "마그노리그난"): [],
+    (297, "리놀레인산"): ["LINOLEIC ACID"],
+    (297, "아스코빌APPA"): [],
+    (297, "코엔자임Q10"): ["UBIQUINONE"],
+    (298, "감초추출물"): ["GLYCYRRHIZA GLABRA RHIZOME/ROOT EXTRACT"],
+    (299, "마치현추출물"): ["PORTULACA OLERACEA FLOWER/LEAF/STEM EXTRACT"],
+    (300, "선인장추출물"): [],
+    (302, "베타-카로틴"): ["CI 40800"],
+    (302, "에틸아스코빌에테르"): ["3-O-ETHYL ASCORBIC ACID"],
+    (305, "올리고펩타이드-n"): [],              # 계열명
+    (305, "헥사펩타이드-n"): [],                # 계열명
+    (306, "아젤라산"): [],                      # Gold에 AZELAIC ACID 없음
 }
 
 
