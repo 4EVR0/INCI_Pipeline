@@ -206,8 +206,14 @@ def match_entry(entry: dict, index: dict[tuple[str, str], set[str]]) -> tuple[li
           ambiguous(INCI 후보 여럿) | unmatched | rejected(사람이 매칭 없음으로 확정)
     """
     manual = MANUAL_INCI.get((entry["print_page"], entry["kor_name"]))
+    if manual:
+        return list(manual), [], "matched"
     if manual is not None:
-        return list(manual), [], "matched" if manual else "rejected"
+        # 거절은 "그때 Gold에 맞는 INCI가 없었다"는 판단이다. Gold가 고쳐져 책 INCI가 그대로 잡히면 그쪽을 따른다.
+        direct = [_lookup(index, "inci", name) for name in entry["inci_names"]]
+        if direct and all(len(hits) == 1 for hits in direct):
+            return sorted(set().union(*direct)), [], "matched"
+        return [], [], "rejected"
     auto: set[str] = set()
     candidates: set[str] = set()
     ambiguous = False

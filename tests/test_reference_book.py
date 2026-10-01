@@ -79,6 +79,13 @@ def test_manual_rejection(monkeypatch):
         "rejected", "rejected_by_review"]
 
 
+def test_manual_rejection_yields_to_exact_gold_match(monkeypatch):
+    # Gold 오매핑 때문에 거절했던 항목도, Gold가 고쳐져 책 INCI가 그대로 있으면 자동 매칭된다
+    monkeypatch.setitem(silver.MANUAL_INCI, (12, "글루코오스"), [])
+    tables = _silver(_entry("글루코오스", ["Glucose"], ["HYDRATING"]))
+    assert tables["matched"].loc["글루코오스", "inci_names"] == "GLUCOSE"
+
+
 def test_gold_uses_matched_evidence_only_and_prefers_skin_scope():
     matched = silver.build_silver([
         _entry("글루코오스", ["Glucose"], ["HYDRATING"], scope="general"),
