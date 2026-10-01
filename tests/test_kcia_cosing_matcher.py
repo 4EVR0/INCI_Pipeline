@@ -6,7 +6,9 @@ from pipeline.silver_mapping.kcia_cosing.matcher import (
     cas_match,
     deduplicate_cosing,
     exact_match,
+    fuzzy_match_one,
     is_cas_name_compatible,
+    is_number_compatible,
 )
 from pipeline.silver_mapping.kcia_cosing.normalizer import build_name_keys, normalize_cas
 
@@ -135,3 +137,58 @@ def test_cas_mismatch_without_name_match_goes_to_review():
         "감자전분": "AVENA SATIVA STARCH",
         "가지열매추출물": "SOLANUM MELONGENA ROOT EXTRACT",
     }
+
+
+@pytest.mark.parametrize(
+    "eng_name, inci_name, expected",
+    [
+        ("Polypropanediol-34", "POLYPROPANEDIOL-4", False),
+        ("Acetyl Hexapeptide-24 Amide", "ACETYL HEXAPEPTIDE-8", False),
+        ("Bis-Methoxy PEG-15 Poly(Tetramethylxylene Diisocyanate)",
+         "BIS-METHOXY PEG-10 POLY(TETRAMETHYLXYLENE DIISOCYANATE)", False),
+        ("C28-52 Olefin", "POLY(C20-28 OLEFIN)", False),
+        ("Tripeptide-31", "TRIPEPTIDE-1", False),
+        ("HC Red No.10", "HC RED NO. 11", False),
+        ("HC Red No.11", "HC RED NO. 11", True),
+        ("Ethyl 2-Methyl Butyrate", "ETHYL 2-METHYLBUTYRATE", True),
+        # 색소 번호 ↔ CI 번호, 색 이름만 겹치는 동의어는 번호를 비교하지 않는다
+        ("Orange no. 401", "CI 11725", True),
+        ("Brilliant Blue FCF", "ACID BLUE 9", True),
+        # 한쪽에만 있는 위치 번호는 표기 차이로 본다
+        ("Ethyl Ascorbyl Ether", "3-O-ETHYL ASCORBIC ACID", True),
+    ],
+)
+def test_is_number_compatible(eng_name, inci_name, expected):
+    assert is_number_compatible(eng_name, inci_name) is expected
+
+
+def test_cas_match_drops_number_mismatched_candidates():
+    cosing = _cosing([
+        ("POLYPROPANEDIOL-4", "345260-48-2"),
+        ("BIS-METHOXY PEG-10 POLY(TETRAMETHYLXYLENE DIISOCYANATE)", "189353-43-9"),
+        ("PEG-15 GLYCERYL STEARATE", "68153-76-4"),
+        ("PEG-15 GLYCERYL ISOSTEARATE", "68153-76-4"),
+    ])
+    kcia = _kcia([
+        ("폴리프로판다이올-34", "Polypropanediol-34", "345260-48-2"),
+        ("비스-메톡시피이지-15", "Bis-Methoxy PEG-15 Poly(Tetramethylxylene Diisocyanate)", "189353-43-9"),
+        ("피이지-15글리세릴아이소스테아레이트", "PEG-15 Glyceryl Isostearate", "68153-76-4"),
+    ])
+
+    matched, rejected, unmatched = cas_match(kcia, cosing)
+
+    assert dict(zip(matched["std_name_ko"], matched["inci_name"])) == {
+        "피이지-15글리세릴아이소스테아레이트": "PEG-15 GLYCERYL ISOSTEARATE",
+    }
+    # 번호가 다른 후보는 review 후보로도 남기지 않는다 (Gold가 review 후보를 inci_name으로 싣기 때문)
+    assert rejected.empty
+    assert set(unmatched["std_name_ko"]) == {"폴리프로판다이올-34", "비스-메톡시피이지-15"}
+
+
+def test_fuzzy_match_skips_number_mismatched_candidates():
+    candidates = ["tripeptide 1", "sh pentapeptide 9", "pentapeptide 49"]
+
+    assert fuzzy_match_one("tripeptide 31", candidates, 90) == (None, None)
+    key, score = fuzzy_match_one("pentapeptide 9", candidates, 90)
+    assert key == "sh pentapeptide 9"
+    assert score >= 90
