@@ -111,6 +111,24 @@ MANUAL_INCI: dict[tuple[int, str], list[str]] = {
     (78, "살구추출물"): [],                     # 후보가 잎 세포 추출물
     (79, "상백피추출물"): [],                   # 책은 가지·껍질·잎 ↔ ROOT BARK
     (80, "생강추출물"): [],                     # 다른 종(Zingiber Aromaticus)
+    # 61~80쪽(print 81~100) 검토
+    (81, "서양인삼뿌리추출물"): ["PANAX QUINQUEFOLIUS ROOT EXTRACT"],  # 철자 차이
+    (82, "서양자두추출물"): [],                 # 열매 추출물 ↔ JUICE/WOOD ASH
+    (82, "서양측백나무추출물"): [],             # 잎·껍질 묶음
+    (83, "석류나무추출물"): [],                 # 꽃·껍질·열매 묶음
+    (84, "선인장추출물"): [],                   # 후보가 STEM WATER
+    (85, "세라마이드 3"): ["CERAMIDE NP"],      # 같은 물질의 옛 이름
+    (85, "세럼알부민"): [],
+    (85, "세럼프로테인"): [],
+    (86, "세신추출물"): ["ASARUM SIEBOLDII ROOT EXTRACT"],      # 철자 차이
+    (86, "세이지잎수"): [],                     # 잎 증류수 ↔ 전체 추출물
+    (87, "세이지잎추출물"): [],                 # 잎 ↔ 전체 추출물(넓음)
+    (94, "쇠뜨기잎추출물"): ["EQUISETUM ARVENSE LEAF POWDER"],  # 추출물 ↔ 가루, 같은 부위
+    (95, "쇠비름가루"): ["PORTULACA OLERACEA FLOWER/LEAF/STEM EXTRACT"],  # 가루 ↔ 추출물, 같은 부위
+    (95, "수박추출물"): ["CITRULLUS LANATUS FRUIT EXTRACT"],    # Vulgaris는 Lanatus의 옛 학명
+    (95, "수세미오이열매/잎/줄기추출물"): [],   # 후보가 혼합 추출물
+    (96, "쉐어버터"): ["BUTYROSPERMUM PARKII BUTTER"],
+    (100, "스핑고리피드"): [],                  # 후보가 CEREBROSIDES
 }
 
 
