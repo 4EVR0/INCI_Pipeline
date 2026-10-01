@@ -15,7 +15,7 @@ from .io import (
     normalize_output_nulls,
     write_csv,
 )
-from .matcher import deduplicate_cosing, exact_match, fuzzy_match_dataframe
+from .matcher import cas_match, deduplicate_cosing, exact_match, fuzzy_match_dataframe
 from .normalizer import build_name_keys, normalize_cas
 from .s3_io import upload_file, upload_json
 from .write_iceberg import write_silver_to_iceberg
@@ -84,7 +84,6 @@ class KCIACosIngSilverMapper:
         assert self.kcia is not None
         assert self.cosing is not None
 
-        cosing_cas = deduplicate_cosing(self.cosing, "key_cas")
         cosing_basic = deduplicate_cosing(self.cosing, "key_basic")
         cosing_full = deduplicate_cosing(self.cosing, "key_full")
         cosing_paren_removed = deduplicate_cosing(self.cosing, "key_paren_removed")
@@ -111,13 +110,11 @@ class KCIACosIngSilverMapper:
             "candidate_inci_name",
         ]
 
-        cur = self.kcia.copy()
-        matched_frames: list[pd.DataFrame] = []
+        matched_cas, cas_rejected, cur = cas_match(self.kcia.copy(), self.cosing)
+        matched_frames: list[pd.DataFrame] = [matched_cas]
         review_frames: list[pd.DataFrame] = []
 
-        for left_key, right_key, match_type, right_df in [
-            ("key_cas", "key_cas", "exact_cas", cosing_cas),
-            ("key_basic", "key_basic", "exact_basic", cosing_basic),
+        for left_key, right_key, match_type, right_df in [            ("key_basic", "key_basic", "exact_basic", cosing_basic),
             ("key_full", "key_full", "exact_full_normalized", cosing_full),
             ("key_paren_removed", "key_paren_removed", "exact_paren_removed", cosing_paren_removed),
             ("key_sorted", "key_sorted", "exact_word_sorted", cosing_sorted),
@@ -136,6 +133,13 @@ class KCIACosIngSilverMapper:
             auto_threshold=self.settings.fuzzy_auto_threshold,
             review_threshold=self.settings.fuzzy_review_threshold,
         )
+
+        # CAS 후보가 부위·형태 불일치로 거절됐고 이름 매칭도 실패한 행은 unmatched 대신 review로 보낸다.
+        cas_review_mask = final_unmatched["ingredient_code"].isin(cas_rejected["ingredient_code"])
+        review_frames.append(
+            cas_rejected[cas_rejected["ingredient_code"].isin(final_unmatched.loc[cas_review_mask, "ingredient_code"])]
+        )
+        final_unmatched = final_unmatched[~cas_review_mask].copy()
 
         matched_final = pd.concat([*matched_frames, fuzzy_auto], ignore_index=True)
         fuzzy_review_all = pd.concat([*review_frames, fuzzy_review], ignore_index=True)
