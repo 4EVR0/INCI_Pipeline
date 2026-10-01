@@ -186,6 +186,15 @@ MANUAL_INCI: dict[tuple[int, str], list[str]] = {
     (184, "코코넛오일"): [],                    # ↔ SEED BUTTER(Gold에 COCOS NUCIFERA OIL 없음)
     (185, "콜라겐"): [],                        # ATELOCOLLAGEN은 다른 원료
     (185, "콜라겐아미노산"): ["COLLAGEN AMINO ACIDS"],
+    # 161~180쪽(print 186~209) 검토
+    (189, "클라리오일"): ["SALVIA SCLAREA OIL"],
+    (192, "키위추출물"): [],                    # ↔ FRUIT 원물
+    (202, "티타늄/티타늄디옥사이드"): ["TITANIUM/TITANIUM DIOXIDE", "CI 77891"],
+    (202, "티트리잎수"): [],                    # 잎 증류수 ↔ LEAF EXTRACT
+    (204, "파바"): [],
+    (206, "팔미토일올리고펩타이드"): [],        # 번호 있는 펩타이드로 특정 불가
+    (209, "페퍼민트추출물"): [],                # 전초 ↔ LEAF EXTRACT
+    (209, "편백가루"): [],                      # 가지·줄기 가루 ↔ BRANCH/LEAF EXTRACT
 }
 
 
