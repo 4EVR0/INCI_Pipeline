@@ -3,7 +3,10 @@
 산출물(항목 단위, 모든 Bronze 항목이 셋 중 하나에 들어간다):
   matched    자동 매칭 또는 사람 확정(MANUAL_INCI). partial은 자동으로 확정된 INCI만 여기 들어간다
   review     근거를 만드는 미확정 항목(needs_review·ambiguous·unmatched·partial의 나머지) → 사람이 MANUAL_INCI로 확정
-  unmatched  근거가 없어 검토할 필요가 없는 미확정 항목, 사람이 매칭 없음으로 확정한 항목(rejected)
+  unmapped   INCI가 없는 항목(rejected, 근거가 없는 미확정). 버리지 않고 보관해 나중에 제품 전성분(한글명)과
+             직접 매칭하는 입력으로 쓴다
+
+원문 정책: Silver에는 설명 전문을 넣지 않고 효능 주장 구절(skin_claims)만 검토용으로 남긴다.
 
 매칭(정확 일치만, 추측 금지). 책 영문명마다 따로 판단한다:
   - 자동 매칭: 책 영문명 == Gold inci_name (소문자·영숫자만, 괄호 속 일반명 제거 후 비교 포함)이고 후보가 1개
@@ -27,8 +30,226 @@ import pandas as pd
 
 CAUTION_BLOCKED_EFFECTS = frozenset({"SOOTHING", "ANTI_INFLAMMATORY"})
 ESSENTIAL_OIL_MARKERS = ("휘발성 오일", "정유(")
-# 사람이 확정한 매칭. 키: (인쇄 쪽, 책 국문명) → Gold inci_name 목록
-MANUAL_INCI: dict[tuple[int, str], list[str]] = {}
+# 사람이 확정한 매칭. 키: (인쇄 쪽, 책 국문명) → Gold inci_name 목록. 빈 목록 = 매칭 없음으로 확정(rejected).
+# 기준: 같은 식물·부위·형태이고 INCI 표기만 다르면 인정. 부위·형태가 다르거나 넓은 묶음에 붙이는 경우 거절.
+MANUAL_INCI: dict[tuple[int, str], list[str]] = {
+    # 1부 PDF 1~20쪽 검토 (2026-09-30)
+    (12, "가공소금"): [],                                          # 표준 INCI 없음
+    (12, "가시오갈피뿌리추출물"): ["ACANTHOPANAX SENTICOSUS EXTRACT"],  # Gold가 KCIA 뿌리추출물 행을 이 INCI로 묶음
+    (12, "가지추출물"): [],                                        # 열매 ↔ ROOT EXTRACT 부위 다름
+    (13, "갈근추출물"): [],                                        # 뿌리 ↔ FLOWER EXTRACT 부위 다름
+    (14, "감자추출물"): [],                                        # 과육 ↔ CALLUS CULTURE EXTRACT 형태 다름
+    (14, "감초"): ["GLYCYRRHIZA GLABRA RHIZOME/ROOT"],             # 뿌리·뿌리줄기
+    (15, "감초추출물"): ["GLYCYRRHIZA INFLATA ROOT EXTRACT", "GLYCYRRHIZA URALENSIS ROOT EXTRACT",
+                     "GLYCYRRHIZA GLABRA RHIZOME/ROOT EXTRACT"],   # Root ↔ Rhizome/Root 표기 차이
+    (15, "감초플라보노이드"): [],                                   # 대응 INCI 없음
+    (16, "검은깨추출물"): [],                                      # 추출물 ↔ SEED BUTTER 형태 다름
+    (16, "겐티아나추출물"): ["GENTIANA LUTEA RHIZOME/ROOT EXTRACT"],  # 표기 차이
+    (16, "겨우살이추출물"): ["VISCUM ALBUM (MISTLETOE)"],            # Gold가 KCIA 추출물 행을 이 이름으로 묶음
+    (17, "고추냉이뿌리발효추출물"): [],                               # 발효물 INCI 없음
+    (20, "굴추출물"): ["OSTREA EDULIS EXTRACT"],                    # KCIA 굴추출물 행의 INCI
+    (30, "다시마추출물"): [],                                      # ALGAE EXTRACT(조류 전체)는 과대 적용
+    (30, "달맞이꽃씨오일"): ["OENOTHERA BIENNIS OIL"],              # 달맞이꽃 오일 INCI = 씨 오일
+    (31, "대나무추출물"): [],                                      # 뿌리·순 혼합 일반명, 단일 INCI 없음
+    (34, "라벤더추출물"): ["LAVANDULA ANGUSTIFOLIA ANGUSTIFOLIA HERB EXTRACT"],  # herb = 지상부(전초)
+    (31, "대나무수액"): ["BAMBUSA VULGARIS SAP EXTRACT"],          # 수액 ↔ SAP EXTRACT (WATER는 다른 원료일 수 있음)
+    # 21~40쪽(print 35~58) 검토
+    (36, "로즈마리"): [],                       # 포괄 항목 — 잎 오일/꽃 추출물 중 특정 불가
+    (37, "리보플라빈"): ["LACTOFLAVIN"],         # 동일 물질의 다른 이름
+    (38, "린씨드오일"): [],                     # Gold에는 에스터 유도체만 있음
+    (40, "마늘추출물"): [],                     # 알뿌리 ↔ ROOT
+    (41, "마시멜로뿌리추출물"): [],             # 뿌리 ↔ FLOWER
+    (41, "마치현추출물"): ["PORTULACA OLERACEA FLOWER/LEAF/STEM EXTRACT"],
+    (42, "마카다미아씨오일"): ["MACADAMIA INTEGRIFOLIA SEED OIL", "MACADAMIA INTEGRIFOLIA/TETRAPHYLLA SEED OIL"],
+    (43, "만다린추출물"): [],                   # 열매 ↔ PEEL/다른 종
+    (46, "망고씨오일"): [],                     # 오일 ↔ BUTTER
+    (46, "망고추출물"): [],                     # 열매 ↔ SEED BUTTER
+    (46, "매도우스위트추출물"): [],             # 후보가 ROOT
+    (50, "멜론추출물"): ["CUCUMIS MELO CANTALUPENSIS FRUIT EXTRACT"],
+    (50, "명일엽가루"): ["ANGELICA KEISKEI LEAF/STEM EXTRACT"],  # 가루 ↔ 추출물이나 같은 부위로 인정
+    (51, "모란뿌리추출물"): [],                 # 뿌리 ↔ 가지/꽃/잎·전체 묶음
+    (52, "목화씨오일"): [],                     # 종·형태 다름
+    (53, "무화과나무추출물"): [],               # 후보가 BARK
+    (53, "물냉이꽃/잎추출물"): ["NASTURTIUM OFFICINALE FLOWER/LEAF EXTRACT"],
+    (55, "미모사잎추출물"): [],                 # 잎 ↔ BARK
+    (55, "밀싹추출물"): [],                     # 싹 ↔ 전체 추출물
+    (55, "밀전분"): [],                         # 후보가 귀리 전분(KCIA 매핑 오류 의심)
+    (56, "밍크오일"): [],                       # 오일 ↔ 왁스
+    (58, "바나나추출물"): [],                   # 열매 전체/다른 종만 있음
+    # 41~60쪽(print 59~80) 검토
+    (59, "바오밥나무잎추출물"): [],             # 잎 ↔ SEED
+    (59, "바오밥나무펄프추출물"): [],           # 펄프 ↔ SEED
+    (59, "바이오밥나무펄프추출물"): [],
+    (59, "바이오플라보노이드"): ["BIOFLAVONOIDS"],
+    (59, "박하가루/박하잎오일"): ["MENTHA PIPERITA LEAF EXTRACT", "MENTHA ARVENSIS LEAF EXTRACT"],
+    (59, "반하추출물"): ["PINELLIA TERNATA ROOT EXTRACT"],      # 책 철자 오류(Extrat)
+    (60, "발삼캐나다추출물"): [],  # 수정 Gold에서 BALSAM EXTRACT 사라짐  # 줄기에서 나는 수지(balsam)
+    (60, "백금가루"): [],                       # 가루 ↔ 콜로이드
+    (61, "백부자추출물"): [],
+    (62, "베르가못추출물"): [],                 # 설명 식물(Monarda) ↔ INCI(Citrus) 불일치
+    (62, "베어베리추출물"): ["ARCTOSTAPHYLOS UVA-URSI LEAF EXTRACT"],  # 알부틴·하이드로퀴논 → uva-ursi 잎
+    (62, "베타 카로틴"): ["CI 40800"],          # 같은 물질의 색소 번호
+    (63, "벤토나이트"): ["CI 77004"],           # 같은 물질의 색소 번호
+    (63, "변성알코올"): [],                     # ALCOHOL DENAT. ↔ ALCOHOL
+    (64, "보리추출물"): [],                     # 추출물 ↔ CERA
+    (65, "복숭아추출물"): [],                   # 후보가 BUD
+    (66, "부용추출물"): [],
+    (66, "분꽃추출물"): [],                     # 캘러스 가루
+    (67, "붓꽃추출물"): [],                     # 줄기 ↔ ROOT
+    (67, "브로콜리추출물"): [],                 # 새싹 가루
+    (68, "비니거"): [],                         # 책은 목초액, VINEGAR(식초)와 다른 물질
+    (70, "비파엽추출물"): ["ERIOBOTRYA JAPONICA LEAF POWDER"],   # 추출물 ↔ 가루이나 같은 부위로 인정
+    (70, "빈랑자추출물"): [],
+    (70, "빌베리추출물"): [],
+    (71, "뽕나무뿌리(상백피)추출물"): ["MORUS ALBA ROOT BARK EXTRACT"],  # 뿌리 피층 = 뿌리껍질
+    (74, "사과추출물"): [],                     # 추출물 ↔ FRUIT WATER
+    (76, "사탕수수추출물"): [],                 # 추출물 ↔ JUICE EXTRACT
+    (76, "사프란추출물"): ["CROCUS SATIVUS EXTRACT"],            # 책 철자 오류(Sarivus)
+    (76, "산딸기추출물"): [],                   # 후보가 FLOWER
+    (77, "산삼배양근"): [],
+    (77, "산삼배양근추출물"): [],
+    (78, "살구추출물"): [],                     # 후보가 잎 세포 추출물
+    (79, "상백피추출물"): [],                   # 책은 가지·껍질·잎 ↔ ROOT BARK
+    (80, "생강추출물"): [],                     # 다른 종(Zingiber Aromaticus)
+    # 61~80쪽(print 81~100) 검토
+    (81, "서양인삼뿌리추출물"): ["PANAX QUINQUEFOLIUS ROOT EXTRACT"],  # 철자 차이
+    (82, "서양자두추출물"): [],                 # 열매 추출물 ↔ JUICE/WOOD ASH
+    (82, "서양측백나무추출물"): [],             # 잎·껍질 묶음
+    (83, "석류나무추출물"): [],                 # 꽃·껍질·열매 묶음
+    (84, "선인장추출물"): [],                   # 후보가 STEM WATER
+    (85, "세라마이드 3"): ["CERAMIDE NP"],      # 같은 물질의 옛 이름
+    (85, "세럼알부민"): [],
+    (85, "세럼프로테인"): [],
+    (86, "세신추출물"): ["ASARUM SIEBOLDII ROOT EXTRACT"],      # 철자 차이
+    (86, "세이지잎수"): [],                     # 잎 증류수 ↔ 전체 추출물
+    (87, "세이지잎추출물"): [],                 # 잎 ↔ 전체 추출물(넓음)
+    (94, "쇠뜨기잎추출물"): ["EQUISETUM ARVENSE LEAF POWDER"],  # 추출물 ↔ 가루, 같은 부위
+    (95, "쇠비름가루"): ["PORTULACA OLERACEA FLOWER/LEAF/STEM EXTRACT"],  # 가루 ↔ 추출물, 같은 부위
+    (95, "수박추출물"): ["CITRULLUS LANATUS FRUIT EXTRACT"],    # Vulgaris는 Lanatus의 옛 학명
+    (95, "수세미오이열매/잎/줄기추출물"): [],   # 후보가 혼합 추출물
+    (96, "쉐어버터"): ["BUTYROSPERMUM PARKII BUTTER"],
+    (100, "스핑고리피드"): [],                  # 후보가 CEREBROSIDES
+    # 81~100쪽(print 101~121) 검토
+    (102, "식물성스쿠알렌"): ["SQUALANE"],      # 수소 첨가 → 스쿠알란
+    (102, "식물성오일"): ["VEGETABLE OIL"],  # 수정 Gold 기준(OLUS OIL 사라짐)
+    (102, "신갈나무잎추출물"): ["QUERCUS MONGOLICA LEAF EXTRACT"],  # Mongolia는 오기
+    (104, "실크가루"): ["SERICA POWDER"],
+    (105, "쑥추출물"): ["ARTEMISIA VULGARIS HERB EXTRACT"],    # herb = 지상부(전초)
+    (109, "아르니카꽃추출물"): [],              # 추출물 ↔ 꽃 원물
+    (114, "아젤라산"): [],                      # Gold에 AZELAIC ACID 없음(CAS 매칭 누락 의심)
+    (114, "아카시아꽃"): [],
+    (115, "안젤리카"): [],
+    (116, "알로에베라"): [],                    # 후보가 VESICLES
+    (117, "알로에베라잎추출물"): [],            # LEAF WATER(수증기 증류물)는 다른 원료
+    (117, "알로에잎추출물"): [],                # 여러 종 묶음
+    (118, "알부민"): ["ALBUMEN"],               # 달걀 흰자 알부민
+    (119, "알파-비사보롤"): ["BISABOLOL"],
+    (121, "애기부들이삭추출물"): ["TYPHA ANGUSTIFOLIA SPIKE EXTRACT"],
+    # 101~120쪽(print 122~141) 검토
+    (123, "양배추잎추출물"): [],                # 잎 추출물 ↔ JUICE/LEAF WATER
+    (124, "에델바이스꽃/잎추출물"): [],         # ↔ FLOWER/LEAF WATER·ROOT EXTRACT
+    (129, "연꽃뿌리추출물"): ["NELUMBO NUCIFERA ROOT POWDER"],  # 추출물 ↔ 가루, 같은 부위
+    (130, "오디추출물"): [],                    # Gold에 FRUIT EXTRACT 없음(CAS 매칭 문제)
+    (132, "오미자추출물"): [],                  # Gold가 CALLUS EXTRACT로 오매핑(CAS 매칭 문제)
+    (134, "온천수"): [],
+    (135, "올리브오일"): [],                    # Gold가 BUD EXTRACT로 오매핑(CAS 매칭 문제)
+    (136, "와일드타임추출물"): ["THYMUS SERPYLLUM EXTRACT"],   # 철자(Serpillum)
+    (136, "완두콩추출물"): [],                  # 전초 ↔ SEED EXTRACT
+    (137, "왕대수액"): ["PHYLLOSTACHYS BAMBUSOIDES JUICE"],    # 철자(Phyllostachis)
+    (139, "우유"): ["LAC"],                     # 우유의 INCI명
+    (140, "월계수잎추출물"): [],                # ↔ LEAF 원물/BRANCH EXTRACT
+    (141, "위치하젤 추출물"): [],               # 껍질/잔가지 항목이 별도로 있음
+    # 121~140쪽(print 142~163) 검토
+    (143, "유용성감초추출물"): [],
+    (145, "유카추출물"): [],
+    (145, "유칼립투스"): ["EUCALYPTUS GLOBULUS LEAF OIL"],   # 효능 설명이 오일에 대한 것
+    (145, "은행잎추출물"): [],                  # Gold에 LEAF EXTRACT 없음(NUT만)
+    (146, "의이인"): [],
+    (151, "인삼꽃추출물"): [],                  # 후보가 HAIRY ROOT EXTRACT
+    (152, "인삼캘러스배양추출물"): [],          # 후보가 HAIRY ROOT EXTRACT
+    (152, "일당귀추출물"): [],                  # 추출물 ↔ ROOT 원물
+    (156, "자근추출물"): [],                    # 추출물 ↔ ROOT 원물
+    (158, "작약추출물"): ["PAEONIA LACTIFLORA ROOT EXTRACT"],
+    (159, "장미꽃추출물"): [],                  # 후보가 캘러스 추출물
+    (163, "지유추출물"): [],                    # ↔ ROOT/STALK POWDER
+    # 141~160쪽(print 164~186) 검토
+    (165, "징크옥사이드"): ["CI 77947"],        # 산화아연의 색소 번호
+    (168, "참깨오일"): [],                      # 오일 ↔ SEED BUTTER(Gold에 SEED OIL 없음)
+    (169, "창포추출물"): ["ACORUS CALAMUS RHIZOME EXTRACT"],  # 창포 '뿌리' = 뿌리줄기
+    (169, "천궁가루"): [],
+    (176, "카올린"): [],                        # HALLOYSITE는 다른 광물
+    (176, "카카오씨추출물"): [],                # ↔ SEED BUTTER
+    (178, "칼사이트"): ["CALCITE POWDER"],
+    (180, "캐놀라오일"): [],                    # CANOLA OIL은 별개 INCI
+    (181, "캐모마일꽃오일"): ["CHAMOMILLA RECUTITA FLOWER OIL"],
+    (182, "커피추출물"): [],                    # ↔ LEAF CELL EXTRACT
+    (184, "코코넛오일"): [],                    # ↔ SEED BUTTER(Gold에 COCOS NUCIFERA OIL 없음)
+    (185, "콜라겐"): [],                        # ATELOCOLLAGEN은 다른 원료
+    (185, "콜라겐아미노산"): ["COLLAGEN AMINO ACIDS"],
+    # 161~180쪽(print 186~209) 검토
+    (189, "클라리오일"): ["SALVIA SCLAREA OIL"],
+    (192, "키위추출물"): [],                    # ↔ FRUIT 원물
+    (202, "티타늄/티타늄디옥사이드"): ["TITANIUM/TITANIUM DIOXIDE", "CI 77891"],
+    (202, "티트리잎수"): [],                    # 잎 증류수 ↔ LEAF EXTRACT
+    (204, "파바"): [],
+    (206, "팔미토일올리고펩타이드"): [],        # 번호 있는 펩타이드로 특정 불가
+    (209, "페퍼민트추출물"): [],                # 전초 ↔ LEAF EXTRACT
+    (209, "편백가루"): [],                      # 가지·줄기 가루 ↔ BRANCH/LEAF EXTRACT
+    # 181~224쪽(print 210~256) 검토
+    (210, "포도씨가루"): [],                    # ↔ BUD EXTRACT
+    (211, "포도추출물"): [],                    # 열매 ↔ SEED EXTRACT
+    (218, "프렌치라벤더추출물"): [],            # 전초 ↔ FLOWER/STEM EXTRACT
+    (219, "프로폴리스왁스"): ["PROPOLIS WAX"],
+    (223, "피스타치오씨오일"): [],              # 오일 ↔ SEED EXTRACT
+    (239, "하이드롤라이즈드루핀프로테인"): [],
+    (240, "하이드롤라이즈드밀크프로테인"): [],
+    (241, "하이드롤라이즈드실크"): [],
+    (241, "하이드롤라이즈드액틴"): [],
+    (247, "호호바씨오일"): [],                  # Gold에 SEED OIL 없음(CAS 매칭 문제)
+    (247, "홍삼수"): [],
+    (248, "화이트윌로우껍질추출물"): [],        # ↔ 부위 없는 EXTRACT
+    (249, "황"): [],                            # ↔ COLLOIDAL SULFUR
+    (250, "황백추출물"): [],                    # ↔ BARK 원물
+    (251, "효모/홍삼발효여과물"): ["SACCHAROMYCES/PANAX GINSENG ROOT FERMENT FILTRATE"],
+    (252, "효모용해추출물"): [],                # ↔ YEAST EXTRACT
+    (253, "흑설탕추출물"): [],
+    # 2부(화장품성분 분류, print 259~310) 검토
+    (261, "올리브오일"): [],                    # Gold 오매핑(BUD EXTRACT)
+    (262, "피마자오일"): [],                    # Gold에 SEED OIL 없음
+    (284, "자몽추출물"): [],                    # 후보가 다른 종(CITRUS GRANDIS)
+    (286, "티타늄디옥사이드"): ["CI 77891"],
+    (286, "징크옥사이드"): ["CI 77947"],
+    (287, "벤조페논-n"): [],                    # 계열명
+    (296, "레티놀"): ["RETINOL"],
+    (296, "레티닐팔미테이트"): ["RETINYL PALMITATE"],
+    (296, "아데노신(주름 고시원료)"): ["ADENOSINE"],
+    (296, "폴리에톡실레이티드레틴아마이드"): [],
+    (297, "닥나무추출물"): [],
+    (297, "알부틴(미백 고시원료)"): ["ARBUTIN"],
+    (297, "유용성감초추출물"): [],
+    (297, "에틸아스코빌에테르"): ["3-O-ETHYL ASCORBIC ACID"],
+    (297, "아스코빌글루코사이드"): ["ASCORBYL GLUCOSIDE"],
+    (297, "마그네슘아스코빌포스페이트"): ["MAGNESIUM ASCORBYL PHOSPHATE"],
+    (297, "나이아신아마이드"): ["NIACINAMIDE"],
+    (297, "알파-비사보롤"): ["BISABOLOL"],
+    (297, "아스코빌테트라이소팔미테이트"): ["ASCORBYL TETRAISOPALMITATE"],
+    (297, "루시놀"): ["4-BUTYLRESORCINOL"],
+    (297, "엘라그산"): ["ELLAGIC ACID"],
+    (297, "트라넥삼산"): ["TRANEXAMIC ACID"],
+    (297, "마그노리그난"): [],
+    (297, "리놀레인산"): ["LINOLEIC ACID"],
+    (297, "아스코빌APPA"): [],
+    (297, "코엔자임Q10"): ["UBIQUINONE"],
+    (298, "감초추출물"): ["GLYCYRRHIZA GLABRA RHIZOME/ROOT EXTRACT"],
+    (299, "마치현추출물"): ["PORTULACA OLERACEA FLOWER/LEAF/STEM EXTRACT"],
+    (300, "선인장추출물"): [],
+    (302, "베타-카로틴"): ["CI 40800"],
+    (302, "에틸아스코빌에테르"): ["3-O-ETHYL ASCORBIC ACID"],
+    (305, "올리고펩타이드-n"): [],              # 계열명
+    (305, "헥사펩타이드-n"): [],                # 계열명
+    (306, "아젤라산"): [],                      # Gold에 AZELAIC ACID 없음
+    (273, "정제수"): ["WATER"],
+}
 
 
 def is_essential_oil(entry: dict) -> bool:
@@ -57,15 +278,17 @@ def build_gold_index(gold: pd.DataFrame) -> dict[tuple[str, str], set[str]]:
             continue
         for kind, value in (("inci", inci), ("eng", row.get("eng_name"))):
             if value:
+                # 괄호를 뗀 키는 따로 둔다. 혼합 원료 '(A)/(B)/C EXTRACT'가 'C EXTRACT'와 섞이지 않게
                 index.setdefault((kind, _eng_key(value)), set()).add(inci)
-                index.setdefault((kind, _eng_key_no_paren(value)), set()).add(inci)
+                index.setdefault((kind + "~", _eng_key_no_paren(value)), set()).add(inci)
         if row.get("kor_name"):
             index.setdefault(("kor", _kor_key(row["kor_name"])), set()).add(inci)
     return index
 
 
 def _lookup(index: dict, kind: str, name: str) -> set[str]:
-    return index.get((kind, _eng_key(name))) or index.get((kind, _eng_key_no_paren(name))) or set()
+    return (index.get((kind, _eng_key(name))) or index.get((kind, _eng_key_no_paren(name)))
+            or index.get((kind + "~", _eng_key_no_paren(name))) or set())
 
 
 def match_entry(entry: dict, index: dict[tuple[str, str], set[str]]) -> tuple[list[str], list[str], str]:
@@ -74,9 +297,19 @@ def match_entry(entry: dict, index: dict[tuple[str, str], set[str]]) -> tuple[li
     상태: matched(모든 영문명 자동) | partial(일부만 자동) | needs_review(eng·kor 후보만) |
           ambiguous(INCI 후보 여럿) | unmatched | rejected(사람이 매칭 없음으로 확정)
     """
+    # 책 INCI가 Gold에 그대로 있으면 사람 판정보다 우선한다. 판정은 "그때 Gold"를 기준으로 한 것이라
+    # Gold가 고쳐지면 거절했던 항목도 정확한 INCI로 돌아온다.
+    direct = [_lookup(index, "inci", name) for name in entry["inci_names"]]
+    if direct and all(len(hits) == 1 for hits in direct):
+        return sorted(set().union(*direct)), [], "matched"
     manual = MANUAL_INCI.get((entry["print_page"], entry["kor_name"]))
-    if manual is not None:
-        return list(manual), [], "matched" if manual else "rejected"
+    if manual is not None and not manual:
+        return [], [], "rejected"
+    if manual:
+        # 판정한 INCI가 새 Gold에서 사라졌으면 그 판정은 쓰지 않고 다시 검토 목록으로 보낸다
+        alive = [inci for inci in manual if index.get(("inci", _eng_key(inci)))]
+        if alive:
+            return alive, [], "matched"
     auto: set[str] = set()
     candidates: set[str] = set()
     ambiguous = False
@@ -108,14 +341,14 @@ def match_entry(entry: dict, index: dict[tuple[str, str], set[str]]) -> tuple[li
 
 SILVER_COLUMNS = [
     "print_page", "pdf_page", "kor_name", "book_inci", "match_status", "inci_names", "review_candidates",
-    "claim_scope", "effect_codes", "blocked_effects", "skin_claims", "caution", "bronze_source",
+    "claim_scope", "effect_codes", "blocked_effects", "skin_claims", "caution", "unmapped_reason", "bronze_source",
 ]
 
 
 def build_silver(entries: Iterable[dict], gold: pd.DataFrame) -> dict[str, pd.DataFrame]:
     """{'matched', 'review', 'unmatched'} DataFrame. 효능은 주의 문구·정유 규칙을 적용한 뒤의 값."""
     index = build_gold_index(gold)
-    out: dict[str, list[dict]] = {"matched": [], "review": [], "unmatched": []}
+    out: dict[str, list[dict]] = {"matched": [], "review": [], "unmapped": []}
     for entry in entries:
         incis, candidates, status = match_entry(entry, index)
         effects = list(entry["effect_codes"])
@@ -129,7 +362,7 @@ def build_silver(entries: Iterable[dict], gold: pd.DataFrame) -> dict[str, pd.Da
             "inci_names": " | ".join(incis), "review_candidates": " | ".join(candidates),
             "claim_scope": entry["claim_scope"], "effect_codes": "|".join(effects),
             "blocked_effects": "|".join(blocked), "skin_claims": " / ".join(entry["skin_claims"]),
-            "caution": entry.get("caution", ""),
+            "caution": entry.get("caution", ""), "unmapped_reason": "",
             "bronze_source": entry.get("extraction_source") or entry.get("_source", ""),
         }
         if incis:
@@ -139,5 +372,7 @@ def build_silver(entries: Iterable[dict], gold: pd.DataFrame) -> dict[str, pd.Da
         if status in ("partial", "needs_review", "ambiguous", "unmatched") and gives_evidence:
             out["review"].append(row)
         elif not incis:
-            out["unmatched"].append(row)
+            row["unmapped_reason"] = ("rejected_by_review" if status == "rejected"
+                                      else "no_evidence_unconfirmed")
+            out["unmapped"].append(row)
     return {name: pd.DataFrame(rows, columns=SILVER_COLUMNS) for name, rows in out.items()}

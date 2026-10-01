@@ -2,6 +2,8 @@
 
 - 효능이 남아 있고 범위가 skin·general인 matched 항목만 쓴다(용도만 있는 항목·주의 문구로 막힌 효능은 Silver에서 이미 제외).
 - 같은 성분·효능을 여러 항목이 말하면 skin 범위를 우선해 하나로 합치고, 출처 쪽·책 항목명을 모두 남긴다.
+- 원문 정책: Gold에는 책 문장·구절을 넣지 않고 구조화된 값(효능 코드·범위·출처)만 둔다. 그래프·응답에서
+  설명이 필요하면 효능 코드별로 정해진 문구를 쓴다(책 문장을 옮기지 않음).
 """
 
 from __future__ import annotations
@@ -11,7 +13,7 @@ import pandas as pd
 BOOK_CITATION = "김기연 외, 『화장품성분학 사전』, 현문사, 2011 (ISBN 9788966300891)"
 EVIDENCE_TYPE = "reference_book"
 GOLD_COLUMNS = ["inci_name", "effect_code", "evidence_type", "claim_scope", "print_page",
-                "book_kor_name", "claims", "citation"]
+                "book_kor_name", "citation"]
 
 
 def build_gold(matched: pd.DataFrame) -> pd.DataFrame:
@@ -25,7 +27,7 @@ def build_gold(matched: pd.DataFrame) -> pd.DataFrame:
                 rows.append({
                     "inci_name": inci, "effect_code": effect, "evidence_type": EVIDENCE_TYPE,
                     "claim_scope": item["claim_scope"], "print_page": str(item["print_page"]),
-                    "book_kor_name": item["kor_name"], "claims": item["skin_claims"], "citation": BOOK_CITATION,
+                    "book_kor_name": item["kor_name"], "citation": BOOK_CITATION,
                 })
     evidence = pd.DataFrame(rows, columns=GOLD_COLUMNS)
     if evidence.empty:
@@ -37,4 +39,4 @@ def build_gold(matched: pd.DataFrame) -> pd.DataFrame:
             .agg({"evidence_type": "first", "claim_scope": "first",
                   "print_page": lambda s: "|".join(dict.fromkeys(s)),
                   "book_kor_name": lambda s: "|".join(dict.fromkeys(s)),
-                  "claims": "first", "citation": "first"})[GOLD_COLUMNS])
+                  "citation": "first"})[GOLD_COLUMNS])

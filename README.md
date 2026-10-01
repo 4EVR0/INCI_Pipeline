@@ -126,13 +126,20 @@ python -m pipeline.mfds_functional.run \
 
 「화장품성분학 사전」(김기연 외, 현문사, 2011)에서 진정·보습 등 **법정 기능성 밖의 효능 근거**를 만든다.
 KCIA/CosIng와 같은 메달리온 구조. 책은 바뀌지 않는 자료라 월간 DAG 밖에서 추출 추가·검토 반영 시에만 수동 실행한다.
-책 원문이 들어가므로 입력(`dev_data/`)·출력(`data/`)은 모두 git에서 제외된다. **그래프에는 아직 적재하지 않는다.**
+입력(`dev_data/`)·로컬 출력(`data/`)은 git에서 제외된다. **그래프에는 아직 적재하지 않는다.**
 
-| 단계 | 내용 | 산출물 (`data/<layer>/reference_book/run_id=…/`) |
-|---|---|---|
-| Bronze | 스캔 이미지에서 추출한 항목 그대로 + 스키마 검증(`bronze.py`) | `entries.jsonl` |
-| Silver | KCIA/CosIng Gold와 INCI 매칭 + 근거 규칙(`silver.py`) | `matched.csv` / `review.csv` / `unmatched.csv` |
-| Gold | matched 중 근거 있는 항목을 성분×효능으로 합침(`gold.py`) | `reference_book_evidence.csv` |
+| 단계 | 내용 | 산출물 | 저장 |
+|---|---|---|---|
+| Bronze | 스캔 이미지에서 추출한 항목 그대로 + 스키마 검증(`bronze.py`) | `entries.jsonl` | 로컬만(설명 원문 포함) |
+| Silver | KCIA/CosIng Gold와 INCI 매칭 + 근거 규칙(`silver.py`) | `matched.csv` / `review.csv` / `unmapped.csv` | 로컬 + `s3://$S3_BUCKET/INCI_data_silver/reference_book/run_id=…/` |
+| Gold | matched 중 근거 있는 항목을 성분×효능으로 합침(`gold.py`) | `reference_book_evidence.csv` | 로컬 + `s3://$S3_BUCKET/INCI_data_gold/reference_book/run_id=…/` |
+
+- 원문 정책: 설명 전문은 Bronze(로컬)에만. Silver는 효능 주장 구절(`skin_claims`)만 검토용으로, Gold는 구조화된 값
+  (`inci_name, effect_code, evidence_type, claim_scope, print_page, book_kor_name, citation`)만 둔다
+- `unmapped.csv`: INCI가 없는 항목(`rejected_by_review`, `no_evidence_unconfirmed`)을 버리지 않고 보관해
+  나중에 제품 전성분(한글명)과 직접 매칭하는 입력으로 쓴다
+- 그래프 적재 시(미정): 기존 `(Ingredient)-[:AFFECTS]->(Effect)`에 `evidence_type=reference_book`으로 추가.
+  `graph_score`(없으면 서버 조회에서 빠짐)·`type`·서버의 근거 표시 문구를 정해야 한다
 
 - 추출(Bronze 입력): 항목별 원문, 화장품 용도, 피부 효능 주장→효능 코드, 제외 주장(섭취·전신·모발·의약 표현), 주의 문구
 - 매칭: 책 영문명이 Gold `inci_name`과 직접 일치할 때만 자동. Gold는 `eng_name`과 `inci_name`이 다른 성분인 행이 있어
@@ -142,7 +149,7 @@ KCIA/CosIng와 같은 메달리온 구조. 책은 바뀌지 않는 자료라 월
 ```bash
 python -m pipeline.reference_book.run --stage all \
   --entries "dev_data/dictionary-poc/entries_part1_*.jsonl" --gold <kcia_cosing_gold_ingredients.csv>
-python -m pipeline.reference_book.run --stage silver   # MANUAL_INCI 반영 후 최신 bronze부터 다시
+python -m pipeline.reference_book.run --stage silver   # MANUAL_INCI 반영 후 최신 bronze부터 다시 (--no-upload: S3 생략)
 python -m pipeline.reference_book.run --stage gold
 ```
 
