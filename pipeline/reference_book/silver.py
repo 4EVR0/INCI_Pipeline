@@ -172,6 +172,20 @@ MANUAL_INCI: dict[tuple[int, str], list[str]] = {
     (158, "작약추출물"): ["PAEONIA LACTIFLORA ROOT EXTRACT"],
     (159, "장미꽃추출물"): [],                  # 후보가 캘러스 추출물
     (163, "지유추출물"): [],                    # ↔ ROOT/STALK POWDER
+    # 141~160쪽(print 164~186) 검토
+    (165, "징크옥사이드"): ["CI 77947"],        # 산화아연의 색소 번호
+    (168, "참깨오일"): [],                      # 오일 ↔ SEED BUTTER(Gold에 SEED OIL 없음)
+    (169, "창포추출물"): ["ACORUS CALAMUS RHIZOME EXTRACT"],  # 창포 '뿌리' = 뿌리줄기
+    (169, "천궁가루"): [],
+    (176, "카올린"): [],                        # HALLOYSITE는 다른 광물
+    (176, "카카오씨추출물"): [],                # ↔ SEED BUTTER
+    (178, "칼사이트"): ["CALCITE POWDER"],
+    (180, "캐놀라오일"): [],                    # CANOLA OIL은 별개 INCI
+    (181, "캐모마일꽃오일"): ["CHAMOMILLA RECUTITA FLOWER OIL"],
+    (182, "커피추출물"): [],                    # ↔ LEAF CELL EXTRACT
+    (184, "코코넛오일"): [],                    # ↔ SEED BUTTER(Gold에 COCOS NUCIFERA OIL 없음)
+    (185, "콜라겐"): [],                        # ATELOCOLLAGEN은 다른 원료
+    (185, "콜라겐아미노산"): ["COLLAGEN AMINO ACIDS"],
 }
 
 
