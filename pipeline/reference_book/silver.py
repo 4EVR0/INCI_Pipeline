@@ -3,7 +3,10 @@
 산출물(항목 단위, 모든 Bronze 항목이 셋 중 하나에 들어간다):
   matched    자동 매칭 또는 사람 확정(MANUAL_INCI). partial은 자동으로 확정된 INCI만 여기 들어간다
   review     근거를 만드는 미확정 항목(needs_review·ambiguous·unmatched·partial의 나머지) → 사람이 MANUAL_INCI로 확정
-  unmatched  근거가 없어 검토할 필요가 없는 미확정 항목, 사람이 매칭 없음으로 확정한 항목(rejected)
+  unmapped   INCI가 없는 항목(rejected, 근거가 없는 미확정). 버리지 않고 보관해 나중에 제품 전성분(한글명)과
+             직접 매칭하는 입력으로 쓴다
+
+원문 정책: Silver에는 설명 전문을 넣지 않고 효능 주장 구절(skin_claims)만 검토용으로 남긴다.
 
 매칭(정확 일치만, 추측 금지). 책 영문명마다 따로 판단한다:
   - 자동 매칭: 책 영문명 == Gold inci_name (소문자·영숫자만, 괄호 속 일반명 제거 후 비교 포함)이고 후보가 1개
@@ -130,14 +133,14 @@ def match_entry(entry: dict, index: dict[tuple[str, str], set[str]]) -> tuple[li
 
 SILVER_COLUMNS = [
     "print_page", "pdf_page", "kor_name", "book_inci", "match_status", "inci_names", "review_candidates",
-    "claim_scope", "effect_codes", "blocked_effects", "skin_claims", "caution", "bronze_source",
+    "claim_scope", "effect_codes", "blocked_effects", "skin_claims", "caution", "unmapped_reason", "bronze_source",
 ]
 
 
 def build_silver(entries: Iterable[dict], gold: pd.DataFrame) -> dict[str, pd.DataFrame]:
     """{'matched', 'review', 'unmatched'} DataFrame. 효능은 주의 문구·정유 규칙을 적용한 뒤의 값."""
     index = build_gold_index(gold)
-    out: dict[str, list[dict]] = {"matched": [], "review": [], "unmatched": []}
+    out: dict[str, list[dict]] = {"matched": [], "review": [], "unmapped": []}
     for entry in entries:
         incis, candidates, status = match_entry(entry, index)
         effects = list(entry["effect_codes"])
@@ -151,7 +154,7 @@ def build_silver(entries: Iterable[dict], gold: pd.DataFrame) -> dict[str, pd.Da
             "inci_names": " | ".join(incis), "review_candidates": " | ".join(candidates),
             "claim_scope": entry["claim_scope"], "effect_codes": "|".join(effects),
             "blocked_effects": "|".join(blocked), "skin_claims": " / ".join(entry["skin_claims"]),
-            "caution": entry.get("caution", ""),
+            "caution": entry.get("caution", ""), "unmapped_reason": "",
             "bronze_source": entry.get("extraction_source") or entry.get("_source", ""),
         }
         if incis:
@@ -161,5 +164,7 @@ def build_silver(entries: Iterable[dict], gold: pd.DataFrame) -> dict[str, pd.Da
         if status in ("partial", "needs_review", "ambiguous", "unmatched") and gives_evidence:
             out["review"].append(row)
         elif not incis:
-            out["unmatched"].append(row)
+            row["unmapped_reason"] = ("rejected_by_review" if status == "rejected"
+                                      else "no_evidence_unconfirmed")
+            out["unmapped"].append(row)
     return {name: pd.DataFrame(rows, columns=SILVER_COLUMNS) for name, rows in out.items()}

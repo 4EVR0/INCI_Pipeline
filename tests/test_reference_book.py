@@ -48,7 +48,8 @@ def test_silver_auto_matches_only_direct_inci():
     assert tables["review"].loc["감초", "match_status"] == "unmatched"
     assert tables["review"].loc["가지추출물", "review_candidates"] == "SOLANUM MELONGENA ROOT EXTRACT"
     # 근거가 없는 항목은 검토하지 않고 unmatched로
-    assert tables["unmatched"].loc["감자전분", "match_status"] == "needs_review"
+    assert tables["unmapped"].loc["감자전분", ["match_status", "unmapped_reason"]].tolist() == [
+        "needs_review", "no_evidence_unconfirmed"]
 
 
 def test_silver_partial_goes_to_both_matched_and_review():
@@ -56,7 +57,7 @@ def test_silver_partial_goes_to_both_matched_and_review():
         "감초추출물", ["Glycyrrhiza Glabra(Licorice) Root Extract", "Glycyrrhiza Inflata Root Extract"], ["BRIGHTENING"]))
     assert tables["matched"].loc["감초추출물", "inci_names"] == "GLYCYRRHIZA INFLATA ROOT EXTRACT"
     assert tables["review"].loc["감초추출물", "match_status"] == "partial"
-    assert tables["unmatched"].empty
+    assert tables["unmapped"].empty
 
 
 def test_silver_blocks_soothing_for_caution_and_essential_oil():
@@ -74,7 +75,8 @@ def test_manual_rejection(monkeypatch):
     monkeypatch.setitem(silver.MANUAL_INCI, (12, "가지추출물"), [])
     tables = _silver(_entry("가지추출물", ["Solanum Melongena(Eggplant) Fruit Extract"], ["SOOTHING"]))
     assert tables["review"].empty
-    assert tables["unmatched"].loc["가지추출물", "match_status"] == "rejected"
+    assert tables["unmapped"].loc["가지추출물", ["match_status", "unmapped_reason"]].tolist() == [
+        "rejected", "rejected_by_review"]
 
 
 def test_gold_uses_matched_evidence_only_and_prefers_skin_scope():
@@ -112,7 +114,7 @@ def test_stages_end_to_end(tmp_path):
     evidence = pd.read_csv(gold_dir / "reference_book_evidence.csv")
     assert evidence[["inci_name", "effect_code"]].values.tolist() == [["GLUCOSE", "HYDRATING"]]
     assert json.loads((silver_dir / "metadata.json").read_text())["counts"] == {
-        "matched": 1, "review": 1, "unmatched": 0}
+        "matched": 1, "review": 1, "unmapped": 0}
 
 
 def test_duplicate_entries_rejected(tmp_path):
@@ -120,3 +122,25 @@ def test_duplicate_entries_rejected(tmp_path):
     path.write_text("\n".join(json.dumps(_entry(k, [])) for k in ("가", "가")), encoding="utf-8")
     with pytest.raises(ValueError, match="중복 항목"):
         load_entries([path])
+
+
+def test_gold_has_no_book_text_and_silver_has_no_full_description():
+    tables = silver.build_silver([_entry("글루코오스", ["Glucose"], ["HYDRATING"], text="설명 전문")], GOLD)
+    assert "text" not in tables["matched"].columns
+    assert "skin_claims" in tables["matched"].columns   # 검토용 구절만
+    evidence = build_gold(tables["matched"])
+    assert not {"claims", "skin_claims", "text"} & set(evidence.columns)
+
+
+def test_upload_targets_silver_and_gold_prefixes(tmp_path, monkeypatch):
+    calls = []
+    monkeypatch.setattr("pipeline.silver_mapping.kcia_cosing.s3_io.upload_file",
+                        lambda path, bucket, key: calls.append((bucket, key)) or f"s3://{bucket}/{key}")
+    monkeypatch.setenv("S3_BUCKET", "test-bucket")
+    out = tmp_path / "run"
+    out.mkdir()
+    (out / "matched.csv").write_text("a\n", encoding="utf-8")
+    (out / "metadata.json").write_text("{}", encoding="utf-8")
+    pipeline_run._upload(out, "silver", "r1")
+    assert calls == [("test-bucket", "INCI_data_silver/reference_book/run_id=r1/matched.csv"),
+                     ("test-bucket", "INCI_data_silver/reference_book/run_id=r1/metadata.json")]
