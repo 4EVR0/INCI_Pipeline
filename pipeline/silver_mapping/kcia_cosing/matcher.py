@@ -104,6 +104,42 @@ def is_cas_name_compatible(eng_name, inci_name) -> bool:
     return _identity_overlaps(kcia_identity, cosing_identity)
 
 
+# 번호가 이름의 일부인 성분(TRIPEPTIDE-31, PEG-15, C28-52 OLEFIN 등)은 번호가 다르면 다른 성분이다.
+# CAS가 generic이거나 fuzzy 점수가 높아도(TRIPEPTIDE-31 ↔ TRIPEPTIDE-1) 같은 성분으로 볼 수 없다.
+# 색 이름은 색소 동의어(BRILLIANT BLUE FCF ↔ ACID BLUE 9)끼리도 겹치므로 공통 단어로 치지 않는다.
+_NUMBER_GUARD_STOPWORDS = {
+    "and", "no", "ci",
+    "black", "blue", "brown", "green", "orange", "pink", "purple", "red", "violet", "white", "yellow",
+}
+
+
+def _number_signature(name) -> tuple[tuple[str, ...], frozenset[str]]:
+    if pd.isna(name):
+        return (), frozenset()
+    tokens = re.findall(r"[a-z]+|\d+", str(name).lower())
+    numbers = tuple(sorted(str(int(t)) for t in tokens if t.isdigit()))
+    words = frozenset(
+        t for t in tokens if t.isalpha() and len(t) >= 2 and t not in _NUMBER_GUARD_STOPWORDS
+    )
+    return numbers, words
+
+
+def is_number_compatible(eng_name, inci_name) -> bool:
+    """
+    두 이름의 숫자 식별자가 충돌하지 않는지 판정한다.
+
+    - 숫자 목록이 같거나 한쪽에만 숫자가 있으면 통과
+      (3-O-ETHYL ASCORBIC ACID ↔ Ethyl Ascorbyl Ether 같은 위치 번호 표기 차이)
+    - 공통 단어가 없으면(색소 번호 ↔ CI 번호 같은 동의어) 숫자를 비교할 근거가 없으므로 통과
+    - 공통 단어가 있는데 숫자 목록이 다르면 다른 성분으로 보고 거절
+    """
+    kcia_numbers, kcia_words = _number_signature(eng_name)
+    cosing_numbers, cosing_words = _number_signature(inci_name)
+    if kcia_numbers == cosing_numbers or not kcia_numbers or not cosing_numbers:
+        return True
+    return not (kcia_words & cosing_words)
+
+
 def deduplicate_cosing(df: pd.DataFrame, key_col: str) -> pd.DataFrame:
     deduped = df[df[key_col] != ""].drop_duplicates(subset=[key_col]).copy()
     return deduped
@@ -280,13 +316,14 @@ def cas_match(
 
     1. 정규화 이름(key_basic)까지 같은 후보 → 승인
     2. KCIA 이름이 CosIng 어딘가에 이름 그대로 존재 → 이름 매칭 단계로 넘김
-    3. 부위·형태가 호환되는 첫 후보 → 승인 (일반 화합물은 기존처럼 첫 후보)
-    4. 호환 후보 없음 → 이름 매칭 단계로 넘기고, 끝까지 못 찾으면 review로 보낸다
+    3. 숫자 식별자가 다른 후보(PEG-15 ↔ PEG-10)는 제외
+    4. 부위·형태가 호환되는 첫 후보 → 승인 (일반 화합물은 기존처럼 첫 후보)
+    5. 호환 후보 없음 → 이름 매칭 단계로 넘기고, 끝까지 못 찾으면 review로 보낸다
 
     반환:
     - exact_matched
-    - cas_rejected: 4번에 해당하는 행 + 거절된 첫 CAS 후보 (review 후보)
-    - unmatched: 2·4번 및 CAS 후보가 없는 행
+    - cas_rejected: 5번에 해당하는 행 + 거절된 첫 CAS 후보 (review 후보)
+    - unmatched: 2·3·5번 및 CAS 후보가 없는 행
     """
     left_df = left_df.loc[:, ~left_df.columns.duplicated()].copy()
 
@@ -326,6 +363,11 @@ def cas_match(
         if key_basic in cosing_name_keys or key_full in cosing_name_keys:
             continue
 
+        # 번호가 다른 후보는 같은 성분일 수 없으므로 review 후보로도 남기지 않는다.
+        candidates = [c for c in candidates if is_number_compatible(eng_name, c[2])]
+        if not candidates:
+            continue
+
         compatible = next(
             (c for c in candidates if is_cas_name_compatible(eng_name, c[2])), None
         )
@@ -355,16 +397,18 @@ def fuzzy_match_one(name: str, candidates: list[str], score_cutoff: int):
     if not name:
         return None, None
 
-    result = process.extractOne(
+    # 점수순으로 보되 번호가 다른 후보(TRIPEPTIDE-31 ↔ TRIPEPTIDE-1)는 건너뛴다.
+    results = process.extract(
         query=name,
         choices=candidates,
         scorer=fuzz.ratio,
         score_cutoff=score_cutoff,
+        limit=None,
     )
 
-    if result:
-        matched_key, score, _ = result
-        return matched_key, score
+    for matched_key, score, _ in results:
+        if is_number_compatible(name, matched_key):
+            return matched_key, score
 
     return None, None
 
