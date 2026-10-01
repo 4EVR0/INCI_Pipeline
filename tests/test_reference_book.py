@@ -86,6 +86,20 @@ def test_manual_rejection_yields_to_exact_gold_match(monkeypatch):
     assert tables["matched"].loc["글루코오스", "inci_names"] == "GLUCOSE"
 
 
+def test_manual_inci_missing_from_gold_goes_back_to_review(monkeypatch):
+    monkeypatch.setitem(silver.MANUAL_INCI, (12, "감초"), ["NOT IN GOLD"])
+    tables = _silver(_entry("감초", ["Glycyrrhiza Glabra(Licorice)"], ["BRIGHTENING"]))
+    assert "감초" in tables["review"].index
+
+
+def test_mixture_name_does_not_shadow_plain_inci():
+    gold = pd.concat([GOLD, pd.DataFrame([
+        {"inci_name": "(PEANUT FRUIT)/CENTELLA ASIATICA EXTRACT", "eng_name": "", "kor_name": ""},
+        {"inci_name": "CENTELLA ASIATICA EXTRACT", "eng_name": "", "kor_name": ""}])])
+    auto, _, status = silver.match_entry(_entry("병풀추출물", ["Centella Asiatica Extract"]), silver.build_gold_index(gold))
+    assert (auto, status) == (["CENTELLA ASIATICA EXTRACT"], "matched")
+
+
 def test_gold_uses_matched_evidence_only_and_prefers_skin_scope():
     matched = silver.build_silver([
         _entry("글루코오스", ["Glucose"], ["HYDRATING"], scope="general"),

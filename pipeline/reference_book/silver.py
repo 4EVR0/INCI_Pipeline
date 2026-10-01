@@ -83,7 +83,7 @@ MANUAL_INCI: dict[tuple[int, str], list[str]] = {
     (59, "바이오플라보노이드"): ["BIOFLAVONOIDS"],
     (59, "박하가루/박하잎오일"): ["MENTHA PIPERITA LEAF EXTRACT", "MENTHA ARVENSIS LEAF EXTRACT"],
     (59, "반하추출물"): ["PINELLIA TERNATA ROOT EXTRACT"],      # 책 철자 오류(Extrat)
-    (60, "발삼캐나다추출물"): ["ABIES BALSAMEA BALSAM EXTRACT"],  # 줄기에서 나는 수지(balsam)
+    (60, "발삼캐나다추출물"): [],  # 수정 Gold에서 BALSAM EXTRACT 사라짐  # 줄기에서 나는 수지(balsam)
     (60, "백금가루"): [],                       # 가루 ↔ 콜로이드
     (61, "백부자추출물"): [],
     (62, "베르가못추출물"): [],                 # 설명 식물(Monarda) ↔ INCI(Citrus) 불일치
@@ -131,7 +131,7 @@ MANUAL_INCI: dict[tuple[int, str], list[str]] = {
     (100, "스핑고리피드"): [],                  # 후보가 CEREBROSIDES
     # 81~100쪽(print 101~121) 검토
     (102, "식물성스쿠알렌"): ["SQUALANE"],      # 수소 첨가 → 스쿠알란
-    (102, "식물성오일"): ["OLUS OIL"],
+    (102, "식물성오일"): ["VEGETABLE OIL"],  # 수정 Gold 기준(OLUS OIL 사라짐)
     (102, "신갈나무잎추출물"): ["QUERCUS MONGOLICA LEAF EXTRACT"],  # Mongolia는 오기
     (104, "실크가루"): ["SERICA POWDER"],
     (105, "쑥추출물"): ["ARTEMISIA VULGARIS HERB EXTRACT"],    # herb = 지상부(전초)
@@ -162,7 +162,7 @@ MANUAL_INCI: dict[tuple[int, str], list[str]] = {
     # 121~140쪽(print 142~163) 검토
     (143, "유용성감초추출물"): [],
     (145, "유카추출물"): [],
-    (145, "유칼립투스"): ["EUCALYPTUS GLOBULUS OIL"],   # 효능 설명이 오일에 대한 것
+    (145, "유칼립투스"): ["EUCALYPTUS GLOBULUS LEAF OIL"],   # 효능 설명이 오일에 대한 것
     (145, "은행잎추출물"): [],                  # Gold에 LEAF EXTRACT 없음(NUT만)
     (146, "의이인"): [],
     (151, "인삼꽃추출물"): [],                  # 후보가 HAIRY ROOT EXTRACT
@@ -199,7 +199,7 @@ MANUAL_INCI: dict[tuple[int, str], list[str]] = {
     (210, "포도씨가루"): [],                    # ↔ BUD EXTRACT
     (211, "포도추출물"): [],                    # 열매 ↔ SEED EXTRACT
     (218, "프렌치라벤더추출물"): [],            # 전초 ↔ FLOWER/STEM EXTRACT
-    (219, "프로폴리스왁스"): ["PROPOLIS CERA"],
+    (219, "프로폴리스왁스"): ["PROPOLIS WAX"],
     (223, "피스타치오씨오일"): [],              # 오일 ↔ SEED EXTRACT
     (239, "하이드롤라이즈드루핀프로테인"): [],
     (240, "하이드롤라이즈드밀크프로테인"): [],
@@ -248,6 +248,7 @@ MANUAL_INCI: dict[tuple[int, str], list[str]] = {
     (305, "올리고펩타이드-n"): [],              # 계열명
     (305, "헥사펩타이드-n"): [],                # 계열명
     (306, "아젤라산"): [],                      # Gold에 AZELAIC ACID 없음
+    (273, "정제수"): ["WATER"],
 }
 
 
@@ -277,15 +278,17 @@ def build_gold_index(gold: pd.DataFrame) -> dict[tuple[str, str], set[str]]:
             continue
         for kind, value in (("inci", inci), ("eng", row.get("eng_name"))):
             if value:
+                # 괄호를 뗀 키는 따로 둔다. 혼합 원료 '(A)/(B)/C EXTRACT'가 'C EXTRACT'와 섞이지 않게
                 index.setdefault((kind, _eng_key(value)), set()).add(inci)
-                index.setdefault((kind, _eng_key_no_paren(value)), set()).add(inci)
+                index.setdefault((kind + "~", _eng_key_no_paren(value)), set()).add(inci)
         if row.get("kor_name"):
             index.setdefault(("kor", _kor_key(row["kor_name"])), set()).add(inci)
     return index
 
 
 def _lookup(index: dict, kind: str, name: str) -> set[str]:
-    return index.get((kind, _eng_key(name))) or index.get((kind, _eng_key_no_paren(name))) or set()
+    return (index.get((kind, _eng_key(name))) or index.get((kind, _eng_key_no_paren(name)))
+            or index.get((kind + "~", _eng_key_no_paren(name))) or set())
 
 
 def match_entry(entry: dict, index: dict[tuple[str, str], set[str]]) -> tuple[list[str], list[str], str]:
@@ -294,15 +297,19 @@ def match_entry(entry: dict, index: dict[tuple[str, str], set[str]]) -> tuple[li
     상태: matched(모든 영문명 자동) | partial(일부만 자동) | needs_review(eng·kor 후보만) |
           ambiguous(INCI 후보 여럿) | unmatched | rejected(사람이 매칭 없음으로 확정)
     """
+    # 책 INCI가 Gold에 그대로 있으면 사람 판정보다 우선한다. 판정은 "그때 Gold"를 기준으로 한 것이라
+    # Gold가 고쳐지면 거절했던 항목도 정확한 INCI로 돌아온다.
+    direct = [_lookup(index, "inci", name) for name in entry["inci_names"]]
+    if direct and all(len(hits) == 1 for hits in direct):
+        return sorted(set().union(*direct)), [], "matched"
     manual = MANUAL_INCI.get((entry["print_page"], entry["kor_name"]))
-    if manual:
-        return list(manual), [], "matched"
-    if manual is not None:
-        # 거절은 "그때 Gold에 맞는 INCI가 없었다"는 판단이다. Gold가 고쳐져 책 INCI가 그대로 잡히면 그쪽을 따른다.
-        direct = [_lookup(index, "inci", name) for name in entry["inci_names"]]
-        if direct and all(len(hits) == 1 for hits in direct):
-            return sorted(set().union(*direct)), [], "matched"
+    if manual is not None and not manual:
         return [], [], "rejected"
+    if manual:
+        # 판정한 INCI가 새 Gold에서 사라졌으면 그 판정은 쓰지 않고 다시 검토 목록으로 보낸다
+        alive = [inci for inci in manual if index.get(("inci", _eng_key(inci)))]
+        if alive:
+            return alive, [], "matched"
     auto: set[str] = set()
     candidates: set[str] = set()
     ambiguous = False
