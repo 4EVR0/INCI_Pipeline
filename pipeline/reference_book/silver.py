@@ -129,6 +129,22 @@ MANUAL_INCI: dict[tuple[int, str], list[str]] = {
     (95, "수세미오이열매/잎/줄기추출물"): [],   # 후보가 혼합 추출물
     (96, "쉐어버터"): ["BUTYROSPERMUM PARKII BUTTER"],
     (100, "스핑고리피드"): [],                  # 후보가 CEREBROSIDES
+    # 81~100쪽(print 101~121) 검토
+    (102, "식물성스쿠알렌"): ["SQUALANE"],      # 수소 첨가 → 스쿠알란
+    (102, "식물성오일"): ["OLUS OIL"],
+    (102, "신갈나무잎추출물"): ["QUERCUS MONGOLICA LEAF EXTRACT"],  # Mongolia는 오기
+    (104, "실크가루"): ["SERICA POWDER"],
+    (105, "쑥추출물"): ["ARTEMISIA VULGARIS HERB EXTRACT"],    # herb = 지상부(전초)
+    (109, "아르니카꽃추출물"): [],              # 추출물 ↔ 꽃 원물
+    (114, "아젤라산"): [],                      # Gold에 AZELAIC ACID 없음(CAS 매칭 누락 의심)
+    (114, "아카시아꽃"): [],
+    (115, "안젤리카"): [],
+    (116, "알로에베라"): [],                    # 후보가 VESICLES
+    (117, "알로에베라잎추출물"): [],            # LEAF WATER(수증기 증류물)는 다른 원료
+    (117, "알로에잎추출물"): [],                # 여러 종 묶음
+    (118, "알부민"): ["ALBUMEN"],               # 달걀 흰자 알부민
+    (119, "알파-비사보롤"): ["BISABOLOL"],
+    (121, "애기부들이삭추출물"): ["TYPHA ANGUSTIFOLIA SPIKE EXTRACT"],
 }
 
 
