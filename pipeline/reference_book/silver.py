@@ -249,6 +249,9 @@ MANUAL_INCI: dict[tuple[int, str], list[str]] = {
     (305, "헥사펩타이드-n"): [],                # 계열명
     (306, "아젤라산"): [],                      # Gold에 AZELAIC ACID 없음
     (273, "정제수"): ["WATER"],
+    # BLEMISH_CARE 재정리로 근거가 생긴 항목
+    (59, "바이오틴"): ["BIOTIN"],               # 책 철자 오류(Biothin)
+    (232, "하수오가루"): [],                    # 가루 ↔ ROOT EXTRACT
 }
 
 
@@ -341,7 +344,7 @@ def match_entry(entry: dict, index: dict[tuple[str, str], set[str]]) -> tuple[li
 
 SILVER_COLUMNS = [
     "print_page", "pdf_page", "kor_name", "book_inci", "match_status", "inci_names", "review_candidates",
-    "claim_scope", "effect_codes", "blocked_effects", "skin_claims", "caution", "unmapped_reason", "bronze_source",
+    "claim_scope", "effect_codes", "blocked_effects", "skin_claims", "caution", "flags", "unmapped_reason", "bronze_source",
 ]
 
 
@@ -362,7 +365,7 @@ def build_silver(entries: Iterable[dict], gold: pd.DataFrame) -> dict[str, pd.Da
             "inci_names": " | ".join(incis), "review_candidates": " | ".join(candidates),
             "claim_scope": entry["claim_scope"], "effect_codes": "|".join(effects),
             "blocked_effects": "|".join(blocked), "skin_claims": " / ".join(entry["skin_claims"]),
-            "caution": entry.get("caution", ""), "unmapped_reason": "",
+            "caution": entry.get("caution", ""), "flags": "|".join(entry.get("flags", [])), "unmapped_reason": "",
             "bronze_source": entry.get("extraction_source") or entry.get("_source", ""),
         }
         if incis:

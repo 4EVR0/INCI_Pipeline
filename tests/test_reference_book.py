@@ -100,6 +100,19 @@ def test_mixture_name_does_not_shadow_plain_inci():
     assert (auto, status) == (["CENTELLA ASIATICA EXTRACT"], "matched")
 
 
+def test_blemish_care_and_medical_wording_flag():
+    matched = silver.build_silver([
+        _entry("글루코오스", ["Glucose"], ["BLEMISH_CARE"], flags=["medical_wording"]),
+        _entry("글루코오스", ["Glucose"], ["BLEMISH_CARE"], print_page=13),
+        _entry("감초추출물", ["Glycyrrhiza Inflata Root Extract"], ["BLEMISH_CARE"], flags=["medical_wording"]),
+    ], GOLD)["matched"]
+    ev = build_gold(matched).set_index("inci_name")
+    # 의약 표현이 아닌 출처가 하나라도 있으면 표시하지 않음
+    assert not ev.loc["GLUCOSE", "medical_wording"]
+    assert ev.loc["GLYCYRRHIZA INFLATA ROOT EXTRACT", "medical_wording"]
+    assert validate(_entry("x", [], ["HYDRATING"], flags=["oops"]), "t")[0].startswith("t: 알 수 없는 flags")
+
+
 def test_gold_uses_matched_evidence_only_and_prefers_skin_scope():
     matched = silver.build_silver([
         _entry("글루코오스", ["Glucose"], ["HYDRATING"], scope="general"),
