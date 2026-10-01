@@ -145,6 +145,20 @@ MANUAL_INCI: dict[tuple[int, str], list[str]] = {
     (118, "알부민"): ["ALBUMEN"],               # 달걀 흰자 알부민
     (119, "알파-비사보롤"): ["BISABOLOL"],
     (121, "애기부들이삭추출물"): ["TYPHA ANGUSTIFOLIA SPIKE EXTRACT"],
+    # 101~120쪽(print 122~141) 검토
+    (123, "양배추잎추출물"): [],                # 잎 추출물 ↔ JUICE/LEAF WATER
+    (124, "에델바이스꽃/잎추출물"): [],         # ↔ FLOWER/LEAF WATER·ROOT EXTRACT
+    (129, "연꽃뿌리추출물"): ["NELUMBO NUCIFERA ROOT POWDER"],  # 추출물 ↔ 가루, 같은 부위
+    (130, "오디추출물"): [],                    # Gold에 FRUIT EXTRACT 없음(CAS 매칭 문제)
+    (132, "오미자추출물"): [],                  # Gold가 CALLUS EXTRACT로 오매핑(CAS 매칭 문제)
+    (134, "온천수"): [],
+    (135, "올리브오일"): [],                    # Gold가 BUD EXTRACT로 오매핑(CAS 매칭 문제)
+    (136, "와일드타임추출물"): ["THYMUS SERPYLLUM EXTRACT"],   # 철자(Serpillum)
+    (136, "완두콩추출물"): [],                  # 전초 ↔ SEED EXTRACT
+    (137, "왕대수액"): ["PHYLLOSTACHYS BAMBUSOIDES JUICE"],    # 철자(Phyllostachis)
+    (139, "우유"): ["LAC"],                     # 우유의 INCI명
+    (140, "월계수잎추출물"): [],                # ↔ LEAF 원물/BRANCH EXTRACT
+    (141, "위치하젤 추출물"): [],               # 껍질/잔가지 항목이 별도로 있음
 }
 
 
