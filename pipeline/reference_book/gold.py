@@ -12,7 +12,7 @@ import pandas as pd
 
 BOOK_CITATION = "김기연 외, 『화장품성분학 사전』, 현문사, 2011 (ISBN 9788966300891)"
 EVIDENCE_TYPE = "reference_book"
-GOLD_COLUMNS = ["inci_name", "effect_code", "evidence_type", "claim_scope", "print_page",
+GOLD_COLUMNS = ["inci_name", "effect_code", "evidence_type", "claim_scope", "medical_wording", "print_page",
                 "book_kor_name", "citation"]
 
 
@@ -26,7 +26,10 @@ def build_gold(matched: pd.DataFrame) -> pd.DataFrame:
             for effect in effects:
                 rows.append({
                     "inci_name": inci, "effect_code": effect, "evidence_type": EVIDENCE_TYPE,
-                    "claim_scope": item["claim_scope"], "print_page": str(item["print_page"]),
+                    "claim_scope": item["claim_scope"],
+                    # 의약 표현 출처만 있는 근거는 응답 문구에서 '치료' 등을 쓰지 않도록 표시
+                    "medical_wording": "medical_wording" in str(item.get("flags", "")).split("|"),
+                    "print_page": str(item["print_page"]),
                     "book_kor_name": item["kor_name"], "citation": BOOK_CITATION,
                 })
     evidence = pd.DataFrame(rows, columns=GOLD_COLUMNS)
@@ -36,7 +39,7 @@ def build_gold(matched: pd.DataFrame) -> pd.DataFrame:
     evidence["_page"] = evidence["print_page"].astype(int)
     return (evidence.sort_values(["inci_name", "effect_code", "_rank", "_page"])
             .groupby(["inci_name", "effect_code"], as_index=False)
-            .agg({"evidence_type": "first", "claim_scope": "first",
+            .agg({"evidence_type": "first", "claim_scope": "first", "medical_wording": "all",
                   "print_page": lambda s: "|".join(dict.fromkeys(s)),
                   "book_kor_name": lambda s: "|".join(dict.fromkeys(s)),
                   "citation": "first"})[GOLD_COLUMNS])

@@ -100,6 +100,19 @@ def test_mixture_name_does_not_shadow_plain_inci():
     assert (auto, status) == (["CENTELLA ASIATICA EXTRACT"], "matched")
 
 
+def test_blemish_care_and_medical_wording_flag():
+    matched = silver.build_silver([
+        _entry("글루코오스", ["Glucose"], ["BLEMISH_CARE"], flags=["medical_wording"]),
+        _entry("글루코오스", ["Glucose"], ["BLEMISH_CARE"], print_page=13),
+        _entry("감초추출물", ["Glycyrrhiza Inflata Root Extract"], ["BLEMISH_CARE"], flags=["medical_wording"]),
+    ], GOLD)["matched"]
+    ev = build_gold(matched).set_index("inci_name")
+    # 의약 표현이 아닌 출처가 하나라도 있으면 표시하지 않음
+    assert not ev.loc["GLUCOSE", "medical_wording"]
+    assert ev.loc["GLYCYRRHIZA INFLATA ROOT EXTRACT", "medical_wording"]
+    assert validate(_entry("x", [], ["HYDRATING"], flags=["oops"]), "t")[0].startswith("t: 알 수 없는 flags")
+
+
 def test_gold_uses_matched_evidence_only_and_prefers_skin_scope():
     matched = silver.build_silver([
         _entry("글루코오스", ["Glucose"], ["HYDRATING"], scope="general"),
@@ -165,3 +178,21 @@ def test_upload_targets_silver_and_gold_prefixes(tmp_path, monkeypatch):
     pipeline_run._upload(out, "silver", "r1")
     assert calls == [("test-bucket", "INCI_data_silver/reference_book/run_id=r1/matched.csv"),
                      ("test-bucket", "INCI_data_silver/reference_book/run_id=r1/metadata.json")]
+
+
+def test_loader_reads_gold_and_guards(tmp_path):
+    from pipeline.reference_book import load_neo4j
+
+    matched = silver.build_silver([
+        _entry("글루코오스", ["Glucose"], ["HYDRATING", "BLEMISH_CARE"], flags=["medical_wording"])], GOLD)["matched"]
+    path = tmp_path / "gold" / "reference_book" / "run_id=r9" / load_neo4j.OUTPUT_NAME
+    path.parent.mkdir(parents=True)
+    build_gold(matched).to_csv(path, index=False)
+    rows = load_neo4j.load_rows(load_neo4j.latest_local(tmp_path))
+    by = {r["effect_code"]: r for r in rows}
+    assert by["BLEMISH_CARE"]["medical_wording"] is True and by["HYDRATING"]["medical_wording"] is True
+    assert load_neo4j.run_id_of(path) == "r9"
+    assert load_neo4j.check_guards(joinable=10, currently_loaded=100)
+    assert not load_neo4j.check_guards(joinable=60, currently_loaded=100)
+    # 논문·CosIng 엣지와 섞이지 않도록 evidence_type이 MERGE 키에 들어가야 한다
+    assert "MERGE (i)-[r:AFFECTS {evidence_type: $evidence_type}]->(e)" in load_neo4j.APPLY_CYPHER

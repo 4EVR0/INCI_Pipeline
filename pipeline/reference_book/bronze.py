@@ -12,6 +12,7 @@
   claim_scope              skin(피부 명시) | general(일반 약리) | role_only(용도만) | truncated(다음 쪽으로 잘림)
   excluded_claims          섭취·전신·모발·의약(치료) 표현 등 피부 효능으로 옮기지 않은 것
   caution (선택)           자극·광독성 등 책의 주의 문구
+  flags (선택)             medical_wording: 효능 주장이 '치료·치유' 등 의약 표현(BLEMISH_CARE 등)
   concern_tags, spans_pages, note, truncated (선택)
 """
 
@@ -24,7 +25,10 @@ EFFECT_CODES = frozenset({
     "ANTI_INFLAMMATORY", "SOOTHING", "BARRIER_REPAIR", "HYDRATING", "MOISTURE_RETENTION",
     "SEBUM_REGULATION", "KERATOLYTIC", "COMEDOLYTIC", "ANTIMICROBIAL", "DEPIGMENTING",
     "BRIGHTENING", "ANTIOXIDANT", "WOUND_HEALING", "ANTI_AGING", "PHOTOPROTECTIVE",
+    # 작용 근거 없이 "여드름·트러블 개선/도움/효과"만 적힌 주장. 작용이 적혀 있으면 해당 효능 코드를 쓴다.
+    "BLEMISH_CARE",
 })
+FLAGS = frozenset({"medical_wording"})   # 원문이 '치료·치유' 같은 의약 표현이라 응답에 그대로 쓰면 안 됨
 SCOPES = frozenset({"skin", "general", "role_only", "truncated"})
 REQUIRED = ("pdf_page", "print_page", "kor_name", "inci_names", "text", "roles",
             "skin_claims", "effect_codes", "claim_scope", "excluded_claims")
@@ -41,6 +45,9 @@ def validate(entry: dict, where: str) -> list[str]:
         problems.append(f"{where}: 알 수 없는 effect_codes {sorted(unknown)}")
     if entry["claim_scope"] == "role_only" and entry["effect_codes"]:
         problems.append(f"{where}: role_only인데 effect_codes 있음")
+    unknown_flags = set(entry.get("flags", [])) - FLAGS
+    if unknown_flags:
+        problems.append(f"{where}: 알 수 없는 flags {sorted(unknown_flags)}")
     if entry["effect_codes"] and not entry["skin_claims"]:
         problems.append(f"{where}: effect_codes의 근거 구절(skin_claims) 없음")
     return problems
