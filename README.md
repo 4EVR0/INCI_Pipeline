@@ -135,11 +135,16 @@ KCIA/CosIng와 같은 메달리온 구조. 책은 바뀌지 않는 자료라 월
 | Gold | matched 중 근거 있는 항목을 성분×효능으로 합침(`gold.py`) | `reference_book_evidence.csv` | 로컬 + `s3://$S3_BUCKET/INCI_data_gold/reference_book/run_id=…/` |
 
 - 원문 정책: 설명 전문은 Bronze(로컬)에만. Silver는 효능 주장 구절(`skin_claims`)만 검토용으로, Gold는 구조화된 값
-  (`inci_name, effect_code, evidence_type, claim_scope, print_page, book_kor_name, citation`)만 둔다
+  (`inci_name, effect_code, evidence_type, claim_scope, medical_wording, print_page, book_kor_name, citation`)만 둔다
 - `unmapped.csv`: INCI가 없는 항목(`rejected_by_review`, `no_evidence_unconfirmed`)을 버리지 않고 보관해
   나중에 제품 전성분(한글명)과 직접 매칭하는 입력으로 쓴다
-- 그래프 적재 시(미정): 기존 `(Ingredient)-[:AFFECTS]->(Effect)`에 `evidence_type=reference_book`으로 추가.
-  `graph_score`(없으면 서버 조회에서 빠짐)·`type`·서버의 근거 표시 문구를 정해야 한다
+- 그래프 적재(`load_neo4j.py`): `(Ingredient)-[:AFFECTS {evidence_type:'reference_book'}]->(Effect)`.
+  evidence_type을 MERGE 키에 넣어 논문·CosIng 엣지와 별개로 두고, 이번 run에 없는 책 엣지는 지운다(멱등).
+  `graph_score`는 크기에 의미가 없는 고정값(`REFERENCE_BOOK_GRAPH_SCORE`, 기본 0.2: CosIng 최대 0.15보다 위)이고
+  근거 종류 간 순서는 서버 정렬이 정한다. `type=improves`, `paper_count=0`
+- 효능 코드 `BLEMISH_CARE`(트러블 개선): 작용 근거 없이 "여드름·트러블 개선/도움/효과"만 적힌 주장. 작용이 적혀 있으면
+  해당 효능(항균·항염·피지·각질)을 쓴다. "치료·치유" 같은 의약 표현은 `flags: [medical_wording]` →
+  Gold·그래프 `medical_wording`(출처가 모두 의약 표현일 때만 true). "여드름 유발하지 않음" 같은 안전성 표현은 효능이 아님
 
 - 추출(Bronze 입력): 항목별 원문, 화장품 용도, 피부 효능 주장→효능 코드, 제외 주장(섭취·전신·모발·의약 표현), 주의 문구
 - 매칭: 책 영문명이 Gold `inci_name`과 직접 일치할 때만 자동. Gold는 `eng_name`과 `inci_name`이 다른 성분인 행이 있어
@@ -151,6 +156,7 @@ python -m pipeline.reference_book.run --stage all \
   --entries "dev_data/dictionary-poc/entries_part1_*.jsonl" --gold <kcia_cosing_gold_ingredients.csv>
 python -m pipeline.reference_book.run --stage silver   # MANUAL_INCI 반영 후 최신 bronze부터 다시 (--no-upload: S3 생략)
 python -m pipeline.reference_book.run --stage gold
+python -m pipeline.reference_book.load_neo4j --s3-latest --dry-run   # 조인·안전장치 확인 후 --dry-run 없이 적재
 ```
 
 ### 식약처 성분 API 파일럿 (선택 실행)
